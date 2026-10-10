@@ -1,0 +1,25 @@
+{
+  "name": "samesies",
+  "version": "1.0.0",
+  "description": "Samesies: a word game for 2 to 5 players",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --minify --format=esm --target=es2020 --outfile=dist/app.js",
+    "test": "node test/logic.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PadreSmitty/samesies.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PadreSmitty/samesies/issues"
+  },
+  "homepage": "https://github.com/PadreSmitty/samesies#readme",
+  "dependencies": {
+    "firebase": "11.0.2"
+  },
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "esbuild": "0.24.0"
+  }
+}
