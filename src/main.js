@@ -76,8 +76,15 @@ function fail(err) {
   render();
 }
 
-const logo = (size = 120, a = '#4B4DDB', b = '#FF6A4D') =>
-  `<svg width="${size}" height="${Math.round(size * 0.633)}" viewBox="0 0 120 76" aria-hidden="true"><circle cx="40" cy="38" r="34" fill="${a}" opacity="0.9"/><circle cx="80" cy="38" r="34" fill="${b}" opacity="0.85"/></svg>`;
+// Two overlapping circles, each rippling outward in fading rings: rounds of guesses meeting in the middle.
+const logo = (size = 170, a = '#4B4DDB', b = '#FF6A4D') =>
+  `<svg width="${size}" height="${Math.round(size * 0.62)}" viewBox="0 -2 200 124" aria-hidden="true">`
+  + `<circle cx="76" cy="60" r="58" fill="none" stroke="${a}" stroke-width="3.5" opacity="0.18"/>`
+  + `<circle cx="124" cy="60" r="58" fill="none" stroke="${b}" stroke-width="3.5" opacity="0.18"/>`
+  + `<circle cx="76" cy="60" r="44" fill="none" stroke="${a}" stroke-width="4.5" opacity="0.42"/>`
+  + `<circle cx="124" cy="60" r="44" fill="none" stroke="${b}" stroke-width="4.5" opacity="0.42"/>`
+  + `<circle cx="76" cy="60" r="30" fill="${a}" opacity="0.9"/>`
+  + `<circle cx="124" cy="60" r="30" fill="${b}" opacity="0.85"/></svg>`;
 const listIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>`;
 const checkIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>`;
 const closeIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
@@ -298,7 +305,7 @@ function header(g, title) {
 }
 
 function viewLoading(msg = 'Loading…') {
-  return `<main class="screen center"><div class="pulse">${logo(90)}</div><p class="muted">${esc(msg)}</p></main>`;
+  return `<main class="screen center"><div class="pulse">${logo(120)}</div><p class="muted">${esc(msg)}</p></main>`;
 }
 
 function viewHome() {
@@ -306,7 +313,7 @@ function viewHome() {
   return `
   <main class="screen">
     <div class="hero">
-      ${logo(120)}
+      ${logo(170)}
       <h1 class="wordmark">Samesies</h1>
       <p class="tagline">Two words in. Meet in the middle.</p>
     </div>
@@ -339,7 +346,7 @@ function viewJoin(g) {
   return `
   <main class="screen">
     <div class="hero">
-      ${logo(100)}
+      ${logo(140)}
       <h1 class="wordmark small">Samesies</h1>
       <p class="tagline">${esc(g.players[g.hostUid]?.name || 'A friend')} invited you to game <strong>${esc(g.code)}</strong></p>
     </div>
@@ -449,7 +456,7 @@ function viewReveal(g, entry) {
           <span class="rword">${esc(w.word)}</span>
         </div>`).join('')}
     </section>
-    <div class="row msg">${logo(40)}<span class="muted">${esc(msg)}</span></div>
+    <div class="row msg">${logo(60)}<span class="muted">${esc(msg)}</span></div>
     <div class="grow"></div>
     <button class="btn primary" data-act="seen" data-round="${entry.round}">On to round ${entry.round + 1}</button>
   </main>`;
@@ -461,7 +468,7 @@ function viewWon(g) {
   return `
   <main class="screen win">
     <div class="win-top">
-      <div class="pop">${logo(132, '#FFFFFF', '#FF6A4D')}</div>
+      <div class="pop">${logo(190, '#FFFFFF', '#FF6A4D')}</div>
       <h1 class="win-title">Samesies!</h1>
       <span class="win-sub">Everyone said</span>
       <div class="win-word">${esc(g.winWord)}</div>
@@ -503,7 +510,7 @@ function currentView() {
   if (!state.uid) return viewLoading();
   if (!state.code) return viewHome();
   if (state.gameMissing) {
-    return `<main class="screen center">${logo(90)}<p class="notice">No game with code ${esc(state.code)}.</p><button class="btn outline" data-act="home">Go to start</button></main>`;
+    return `<main class="screen center">${logo(120)}<p class="notice">No game with code ${esc(state.code)}.</p><button class="btn outline" data-act="home">Go to start</button></main>`;
   }
   const g = state.game;
   if (!g) return viewLoading('Finding your game…');
