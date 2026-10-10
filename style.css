@@ -185,3 +185,5 @@ body:has(.win) { background: var(--indigo); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+.no-anim, .no-anim * { animation: none !important; }

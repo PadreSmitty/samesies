@@ -499,7 +499,7 @@ function viewUsedSheet(g) {
       ${g.history.length ? g.history.map((h) => `
         <div class="stack tight">
           <span class="eyebrow">ROUND ${h.round}</span>
-          <div class="chips">${h.words.map((w) => `<span class="chip static">${esc(w.word)}</span>`).join('')}</div>
+          <div class="chips">${h.words.filter((w, i, all) => all.findIndex((x) => normalize(x.word) === normalize(w.word)) === i).map((w) => `<span class="chip static">${esc(w.word)}</span>`).join('')}</div>
         </div>`).join('') : '<p class="muted">Nothing yet. Round one is wide open.</p>'}
     </div>
   </div>`;
@@ -532,9 +532,19 @@ function render() {
   const caret = focusId ? active.selectionStart : null;
 
   const g = state.game;
+  const sheetWasOpen = !!$app.querySelector('.sheet-backdrop');
+  const toastWas = $app.querySelector('.toast')?.textContent;
   $app.innerHTML = currentView()
     + (state.showUsed && g ? viewUsedSheet(g) : '')
     + (state.toast ? `<div class="toast" role="status">${esc(state.toast)}</div>` : '');
+
+  // Live updates re-render everything; only play entrance animations the first time something appears.
+  const main = $app.querySelector('main');
+  const screenKey = main ? main.className + '|' + (main.querySelector('h1')?.textContent || '') : '';
+  if (screenKey === render.lastKey) main.classList.add('no-anim');
+  render.lastKey = screenKey;
+  if (sheetWasOpen) $app.querySelector('.sheet-backdrop')?.classList.add('no-anim');
+  if (toastWas && toastWas === state.toast) $app.querySelector('.toast')?.classList.add('no-anim');
 
   $app.querySelectorAll('input').forEach((i) => {
     if (keep[i.id] !== undefined && i.id !== 'name') i.value = keep[i.id];
