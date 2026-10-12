@@ -5,6 +5,8 @@ import {
   collection, getDocs, serverTimestamp,
 } from 'firebase/firestore';
 import { MIN_PLAYERS, MAX_PLAYERS, makeCode, normalize, cleanWord, isUsed, allMatch, nearlyMatch, commonWord } from './logic.js';
+import { STARTERS } from './starters.js';
+import { unlockAudio, isMuted, setMuted, drumroll, closeSting, fanfare, confetti } from './fx.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAEbf9VBdvXdHUSlH0rZgHL7SmvXyAn_nM',
@@ -32,6 +34,7 @@ const state = {
   uid: null,
   authError: null,
   name: store.get('name', ''),
+  tour: store.get('toured', false) ? null : 0,
   code: new URLSearchParams(location.search).get('g')?.toUpperCase() || null,
   game: null,
   gameMissing: false,
@@ -90,6 +93,7 @@ const listIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" st
 const checkIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>`;
 const backIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>`;
 const backButton = `<button class="icon-btn back" data-act="home" aria-label="Step out to the start screen">${backIcon}</button>`;
+const soundIcon = (off) => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/>${off ? '<path d="M17 9l5 6M22 9l-5 6"/>' : '<path d="M17 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12"/>'}</svg>`;
 const closeIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
 
 // ---------- game actions ----------
@@ -316,6 +320,9 @@ function openGame(code) {
       }
     }
 
+    // Anyone who has played a game doesn't need the first-time walkthrough.
+    if (g.players[state.uid] && state.tour !== null) { state.tour = null; store.set('toured', true); }
+
     // Someone asked "Close enough?"
     if (g.vote && !g.vote.result && g.vote.by !== state.uid) {
       const key = `${code}.${g.vote.round}`;
@@ -357,6 +364,7 @@ function header(g, title) {
       <span class="eyebrow">GAME · ${esc(g.code)}</span>
       <h1 class="h-round">${esc(title)}</h1>
     </div>
+    <button class="icon-btn quiet" data-act="mute" aria-label="${isMuted() ? 'Turn sound on' : 'Turn sound off'}" aria-pressed="${isMuted()}">${soundIcon(isMuted())}</button>
     ${g.status !== 'lobby' ? `<button class="icon-btn" data-act="used" aria-label="Used words, ${usedCount} so far">${listIcon}</button>` : ''}
   </header>`;
 }
@@ -392,7 +400,7 @@ function viewHome() {
         <span class="eyebrow">YOUR GAMES</span>
         <div class="chips">${games.map((x) => `<button class="chip" data-act="open" data-code="${esc(x.code)}">${esc(x.code)}</button>`).join('')}</div>
       </div>` : ''}
-    <p class="fine">2 to 5 players · no sign-up</p>
+    <p class="fine">2 to 5 players · no sign-up · <button class="linkish inline-link" data-act="tour">How to play</button></p>
   </main>`;
 }
 
@@ -477,6 +485,7 @@ function viewRound(g) {
         <label for="word" class="label">Your word</label>
         <input id="word" name="word" class="input big" maxlength="40" autocomplete="off" autocorrect="on" spellcheck="true" autocapitalize="sentences" placeholder="Type it here">
         <button class="btn primary" ${state.busy ? 'disabled' : ''}>Lock it in</button>
+        ${prev ? '' : '<button type="button" class="btn soft" data-act="starter">Stuck? Give me a word</button>'}
         <span class="fine">Nobody sees your word until everyone’s in.</span>
       </form>`}
     ${state.error ? `<p class="error" role="alert">${esc(state.error)}</p>` : ''}
@@ -499,28 +508,44 @@ function viewRound(g) {
   </main>`;
 }
 
+// Groups of two or more players who typed the same thing, biggest first.
+function matchGroups(words) {
+  const groups = {};
+  words.forEach((w) => { (groups[normalize(w.word)] ||= []).push(w); });
+  return Object.values(groups).filter((x) => x.length > 1).sort((a, b) => b.length - a.length);
+}
+
+function listNames(names) {
+  return names.length <= 2 ? names.join(' and ') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+}
+
 function viewReveal(g, entry) {
-  const counts = {};
-  entry.words.forEach((w) => { const k = normalize(w.word); counts[k] = (counts[k] || 0) + 1; });
-  const best = Math.max(...Object.values(counts));
-  const msg = best <= 1
-    ? (entry.words.length === 2 ? 'Not yet! Next round, connect these two.' : 'Not yet! Next round, connect all of these.')
-    : `${best} of ${entry.words.length} matched. So close! Keep going.`;
+  const groups = matchGroups(entry.words);
+  const matched = new Set(groups.flat().map((w) => w.uid));
+  const msg = groups.length
+    ? groups.map((grp) => `${listNames(grp.map((w) => esc(w.name)))} ${grp.length === 2 ? 'both' : 'all'} said <em>${esc(grp[0].word)}</em>!`).join('<br>')
+    : '';
+  const sub = groups.length
+    ? 'So close! Keep going.'
+    : (entry.words.length === 2 ? 'Not yet! Next round, connect these two.' : 'Not yet! Next round, connect all of these.');
   return `
-  <main class="screen">
+  <main class="screen reveal-screen">
     ${header(g, `Round ${entry.round} is in!`)}
     <section class="stack reveal">
-      ${entry.words.map((w, i) => `
-        <div class="reveal-card" style="animation-delay:${i * 140}ms">
+      ${entry.words.map((w) => `
+        <div class="reveal-card${matched.has(w.uid) ? ' matched' : ''}">
           <span class="rname">${esc(w.name)}</span>
           <span class="rword">${esc(w.word)}</span>
         </div>`).join('')}
     </section>
-    <div class="row msg">${logo(60)}<span class="muted">${esc(msg)}</span></div>
+    <div class="after-reveal stack">
+    ${msg ? `<div class="so-close"><span class="so-close-names">${msg}</span><span class="muted">${sub}</span></div>`
+      : `<div class="row msg">${logo(60)}<span class="muted">${esc(sub)}</span></div>`}
     ${g.vote?.round === entry.round ? voteCard(g)
       : `<button class="btn ${nearlyMatch(entry.words.map((w) => w.word)) ? 'close-hot' : 'soft'}" data-act="vote">${nearlyMatch(entry.words.map((w) => w.word)) ? 'Those look the same. Close enough?' : 'Close enough?'}</button>`}
+    </div>
     <div class="grow"></div>
-    <button class="btn primary" data-act="seen" data-round="${entry.round}">On to round ${entry.round + 1}</button>
+    <button class="btn primary after-reveal" data-act="seen" data-round="${entry.round}">On to round ${entry.round + 1}</button>
   </main>`;
 }
 
@@ -565,6 +590,30 @@ function viewWon(g) {
       : `<button class="btn white" data-act="again" ${state.busy ? 'disabled' : ''}>Play again, same crew</button>`}
     <button class="btn ghost-light" data-act="home">Back to start</button>
   </main>`;
+}
+
+const TOUR = [
+  { title: 'Everyone picks a word', body: 'Any word at all. Nobody sees it until everyone’s locked in.' },
+  { title: 'They all flip at once', body: 'Then, next round, everyone looks for one word that connects them all.' },
+  { title: 'Match to win', body: 'Keep connecting until every single player types the same word. Samesies!' },
+];
+
+function viewTour() {
+  const i = state.tour;
+  const step = TOUR[i];
+  return `
+  <div class="sheet-backdrop tour" data-act="tour-skip">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="tour-title" data-stop>
+      <div class="grabber"></div>
+      <div class="tour-art">${logo(110)}</div>
+      <span class="eyebrow">HOW TO PLAY · ${i + 1} OF ${TOUR.length}</span>
+      <h2 id="tour-title" class="h-sheet">${step.title}</h2>
+      <p class="muted tour-body">${step.body}</p>
+      <div class="dots" aria-hidden="true">${TOUR.map((_, j) => `<span class="${j === i ? 'on' : ''}"></span>`).join('')}</div>
+      <button class="btn primary" data-act="tour-next">${i === TOUR.length - 1 ? 'Let’s play' : 'Next'}</button>
+      ${i < TOUR.length - 1 ? '<button class="btn ghost" data-act="tour-skip">Skip</button>' : ''}
+    </div>
+  </div>`;
 }
 
 function viewUsedSheet(g) {
@@ -613,16 +662,18 @@ function render() {
   const caret = focusId ? active.selectionStart : null;
 
   const g = state.game;
-  const sheetWasOpen = !!$app.querySelector('.sheet-backdrop');
+  const sheetWasOpen = !!$app.querySelector('.sheet-backdrop:not(.tour)');
   const toastWas = $app.querySelector('.toast')?.textContent;
   $app.innerHTML = currentView()
     + (state.showUsed && g ? viewUsedSheet(g) : '')
+    + (state.tour !== null && !state.code ? viewTour() : '')
     + (state.toast ? `<div class="toast" role="status">${esc(state.toast)}</div>` : '');
 
   // Live updates re-render everything; only play entrance animations the first time something appears.
   const main = $app.querySelector('main');
   const screenKey = main ? main.className + '|' + (main.querySelector('h1')?.textContent || '') : '';
   if (screenKey === render.lastKey) main.classList.add('no-anim');
+  else if (main) playScreenFx(main, g);
   render.lastKey = screenKey;
   if (sheetWasOpen) $app.querySelector('.sheet-backdrop')?.classList.add('no-anim');
   if (toastWas && toastWas === state.toast) $app.querySelector('.toast')?.classList.add('no-anim');
@@ -634,6 +685,17 @@ function render() {
   if (focusId) {
     const el = document.getElementById(focusId);
     if (el) { el.focus(); try { el.setSelectionRange(caret, caret); } catch { /* ignore */ } }
+  }
+}
+
+function playScreenFx(main, g) {
+  if (main.classList.contains('reveal-screen')) {
+    drumroll(1.4);
+    if (main.querySelector('.matched')) setTimeout(closeSting, 1700);
+  } else if (main.classList.contains('win')) {
+    confetti();
+    fanfare();
+    try { navigator.vibrate?.([80, 60, 160]); } catch { /* not supported */ }
   }
 }
 
@@ -665,6 +727,20 @@ $app.addEventListener('click', async (e) => {
   if (act === 'nudge') nudge(el.dataset.uid);
   if (act === 'again') playAgain();
   if (act === 'vote') startVote();
+  if (act === 'mute') { setMuted(!isMuted()); render(); }
+  if (act === 'starter') {
+    const used = state.game?.used || [];
+    const pool = STARTERS.filter((w) => !isUsed(w, used));
+    const input = document.getElementById('word');
+    if (input && pool.length) { input.value = pool[Math.floor(Math.random() * pool.length)]; input.focus(); }
+  }
+  if (act === 'tour') { state.tour = 0; render(); }
+  if (act === 'tour-next') {
+    if (state.tour < TOUR.length - 1) state.tour += 1;
+    else { state.tour = null; store.set('toured', true); }
+    render();
+  }
+  if (act === 'tour-skip' && !(e.target.closest('[data-stop]') && !e.target.closest('button'))) { state.tour = null; store.set('toured', true); render(); }
   if (act === 'yes') castVote(true);
   if (act === 'no') castVote(false);
   if (act === 'used') { state.showUsed = true; render(); }
@@ -680,8 +756,11 @@ $app.addEventListener('click', async (e) => {
   }
 });
 
+document.addEventListener('pointerdown', unlockAudio, { capture: true });
+
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && state.showUsed) { state.showUsed = false; render(); }
+  if (e.key === 'Escape' && state.tour !== null) { state.tour = null; store.set('toured', true); render(); }
 });
 
 // ---------- boot ----------
