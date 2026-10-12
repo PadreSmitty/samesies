@@ -525,7 +525,7 @@ Play with us:`}async function Xw(){let n=A.game,e=location.origin+location.pathn
       ${e?`
         <span class="muted">Connect these</span>
         <div class="word-chips">${e.words.map(i=>`<span class="word-chip">${q(i.word)}</span>`).join("")}</div>
-        ${e.dealt?`<div class="defs">${e.words.map(i=>`<span><strong>${q(i.word)}:</strong> ${q(i.def)}</span>`).join("")}</div>`:""}
+        ${e.dealt?`<div class="defs">${e.words.filter(i=>i.uid===A.uid).map(i=>`<span>Your word, <strong>${q(i.word)}</strong>, means ${q(i.def)}.</span>`).join("")}</div>`:""}
         ${n.vote?.round===e.round||e.dealt?"":'<button class="linkish close-link" data-act="vote">Close enough? Ask to count it</button>'}`:`
         <span class="muted">Round one</span>
         <p class="prompt">Pick any word in the known universe.</p>
@@ -579,11 +579,11 @@ Play with us:`}async function Xw(){let n=A.game,e=location.origin+location.pathn
         <div class="reveal-card">
           <span class="rname">${q(t.name)} got</span>
           <span class="rword">${q(t.word)}</span>
-          <span class="rdef">${q(t.def)}</span>
+          ${t.uid===A.uid?`<span class="rdef">${q(t.def)}</span>`:'<span class="rdef">Only they know what it means</span>'}
         </div>`).join("")}
     </section>
     <div class="after-reveal stack">
-      <div class="row msg">${Ft(60)}<span class="muted">Everyone got a different word. Next round, find one word that connects them all.</span></div>
+      <div class="row msg">${Ft(60)}<span class="muted">Everyone got a different word, and only you can see your definition. Next round, find one word that connects them all.</span></div>
     </div>
     <div class="grow"></div>
     <button class="btn primary after-reveal" data-act="seen" data-round="${e.round}">Let\u2019s connect them</button>

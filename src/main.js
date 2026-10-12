@@ -572,7 +572,7 @@ function viewRound(g) {
       ${prev ? `
         <span class="muted">Connect these</span>
         <div class="word-chips">${prev.words.map((w) => `<span class="word-chip">${esc(w.word)}</span>`).join('')}</div>
-        ${prev.dealt ? `<div class="defs">${prev.words.map((w) => `<span><strong>${esc(w.word)}:</strong> ${esc(w.def)}</span>`).join('')}</div>` : ''}
+        ${prev.dealt ? `<div class="defs">${prev.words.filter((w) => w.uid === state.uid).map((w) => `<span>Your word, <strong>${esc(w.word)}</strong>, means ${esc(w.def)}.</span>`).join('')}</div>` : ''}
         ${g.vote?.round === prev.round || prev.dealt ? '' : `<button class="linkish close-link" data-act="vote">Close enough? Ask to count it</button>`}`
       : `
         <span class="muted">Round one</span>
@@ -664,11 +664,11 @@ function viewDealt(g, entry) {
         <div class="reveal-card">
           <span class="rname">${esc(w.name)} got</span>
           <span class="rword">${esc(w.word)}</span>
-          <span class="rdef">${esc(w.def)}</span>
+          ${w.uid === state.uid ? `<span class="rdef">${esc(w.def)}</span>` : '<span class="rdef">Only they know what it means</span>'}
         </div>`).join('')}
     </section>
     <div class="after-reveal stack">
-      <div class="row msg">${logo(60)}<span class="muted">Everyone got a different word. Next round, find one word that connects them all.</span></div>
+      <div class="row msg">${logo(60)}<span class="muted">Everyone got a different word, and only you can see your definition. Next round, find one word that connects them all.</span></div>
     </div>
     <div class="grow"></div>
     <button class="btn primary after-reveal" data-act="seen" data-round="${entry.round}">Let’s connect them</button>
