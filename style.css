@@ -187,3 +187,20 @@ body:has(.win) { background: var(--indigo); }
 }
 
 .no-anim, .no-anim * { animation: none !important; }
+
+/* back button + header */
+.bar .back { width: 44px; height: 44px; margin-left: -6px; background: transparent; color: var(--ink); }
+.bar .bar-title { flex-grow: 1; }
+.bar.top-left { position: absolute; top: calc(env(safe-area-inset-top) + 24px); left: 24px; }
+.screen.center { position: relative; }
+.win .bar .back { color: #fff; }
+.hero.tight { margin-top: 0; }
+
+/* close enough */
+.close-link { color: var(--indigo); font-size: 15px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; }
+.btn.close-hot { background: var(--coral); color: var(--ink); animation: nudge-glow 1.6s ease-in-out 2; }
+@keyframes nudge-glow { 50% { transform: scale(1.03); } }
+.vote { background: var(--card); border: 2px solid var(--coral); border-radius: 22px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+.vote.done { border-color: var(--line); }
+.vote-title { font-family: var(--display); font-weight: 800; font-size: 22px; }
+.vote .row .grow { flex-grow: 1; }

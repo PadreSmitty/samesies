@@ -46,3 +46,47 @@ export function isUsed(word, usedNorms) {
 export function allMatch(subs) {
   return subs.length >= MIN_PLAYERS && subs.every((s) => s.norm === subs[0].norm);
 }
+
+function editDistance(a, b) {
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const up = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = up;
+    }
+  }
+  return prev[b.length];
+}
+
+// Typos ("tennesse") and one answer inside the other ("cliff" / "cliff swaim").
+// Short words need an exact match so cat and car never look close.
+export function isClose(a, b) {
+  const x = normalize(a);
+  const y = normalize(b);
+  if (x === y) return true;
+  const shorter = Math.min(x.length, y.length);
+  const d = editDistance(x, y);
+  if (shorter >= 5 && d <= 1) return true;
+  if (shorter >= 9 && d <= 2) return true;
+  const xs = x.split(' ');
+  const ys = y.split(' ');
+  return xs.every((w) => ys.includes(w)) || ys.every((w) => xs.includes(w));
+}
+
+// The spelling most players used, for the win screen.
+export function commonWord(words) {
+  const counts = {};
+  words.forEach((w) => { const k = normalize(w); counts[k] = (counts[k] || 0) + 1; });
+  const top = Object.keys(counts).sort((p, q) => counts[q] - counts[p])[0];
+  return words.find((w) => normalize(w) === top);
+}
+
+// Every answer is close to the most common one: worth suggesting a "Close enough?" vote.
+export function nearlyMatch(words) {
+  if (words.length < MIN_PLAYERS) return false;
+  const top = commonWord(words);
+  return words.every((w) => isClose(w, top)) && !words.every((w) => normalize(w) === normalize(top));
+}

@@ -4,7 +4,7 @@ import {
   getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, runTransaction,
   collection, getDocs, serverTimestamp,
 } from 'firebase/firestore';
-import { MIN_PLAYERS, MAX_PLAYERS, makeCode, normalize, cleanWord, isUsed, allMatch } from './logic.js';
+import { MIN_PLAYERS, MAX_PLAYERS, makeCode, normalize, cleanWord, isUsed, allMatch, nearlyMatch, commonWord } from './logic.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAEbf9VBdvXdHUSlH0rZgHL7SmvXyAn_nM',
@@ -43,6 +43,7 @@ const state = {
 };
 let unsubGame = null;
 let resolving = false;
+let lastVoteSeen = null;
 const nudgeCooldown = {};
 
 // ---------- helpers ----------
@@ -87,6 +88,8 @@ const logo = (size = 170, a = '#4B4DDB', b = '#FF6A4D') =>
   + `<circle cx="124" cy="60" r="30" fill="${b}" opacity="0.85"/></svg>`;
 const listIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>`;
 const checkIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>`;
+const backIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>`;
+const backButton = `<button class="icon-btn back" data-act="home" aria-label="Step out to the start screen">${backIcon}</button>`;
 const closeIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
 
 // ---------- game actions ----------
@@ -222,6 +225,49 @@ async function nudge(targetUid) {
   } catch (e) { fail(e); }
 }
 
+// "Close enough?": anyone can ask to count the last reveal as a match. Every player has to agree.
+async function startVote() {
+  const g = state.game;
+  const last = g.history[g.history.length - 1];
+  if (!last) return;
+  try {
+    await runTransaction(db, async (tx) => {
+      const cur = (await tx.get(gameRef(g.code))).data();
+      const curLast = cur.history[cur.history.length - 1];
+      if (cur.status !== 'playing' || !curLast || curLast.round !== last.round || cur.vote?.round === last.round) return;
+      tx.update(gameRef(g.code), { vote: { round: last.round, by: state.uid, yes: { [state.uid]: true }, no: {}, result: null } });
+    });
+  } catch (e) { fail(e); }
+}
+
+async function castVote(agree) {
+  const g = state.game;
+  try {
+    await runTransaction(db, async (tx) => {
+      const cur = (await tx.get(gameRef(g.code))).data();
+      const v = cur.vote;
+      const curLast = cur.history[cur.history.length - 1];
+      if (cur.status !== 'playing' || !v || v.result || !curLast || v.round !== curLast.round) return;
+      const yes = { ...v.yes };
+      const no = { ...v.no };
+      if (agree) yes[state.uid] = true; else no[state.uid] = true;
+      if (!agree) {
+        tx.update(gameRef(g.code), { vote: { ...v, yes, no, result: 'no' } });
+      } else if (cur.order.every((u) => yes[u])) {
+        tx.update(gameRef(g.code), {
+          vote: { ...v, yes, no, result: 'yes' },
+          status: 'won',
+          wonBy: 'vote',
+          winWord: commonWord(curLast.words.map((w) => w.word)),
+          history: cur.history,
+        });
+      } else {
+        tx.update(gameRef(g.code), { vote: { ...v, yes, no } });
+      }
+    });
+  } catch (e) { fail(e); }
+}
+
 async function playAgain() {
   const old = state.game;
   state.busy = true; render();
@@ -270,6 +316,16 @@ function openGame(code) {
       }
     }
 
+    // Someone asked "Close enough?"
+    if (g.vote && !g.vote.result && g.vote.by !== state.uid) {
+      const key = `${code}.${g.vote.round}`;
+      if (lastVoteSeen !== key) {
+        lastVoteSeen = key;
+        toast(`${g.players[g.vote.by]?.name || 'Someone'} asked: close enough?`);
+        try { navigator.vibrate?.(200); } catch { /* not supported */ }
+      }
+    }
+
     // Do I already have a word in for this round?
     if (g.status === 'playing' && g.submitted?.[state.uid] && state.mySub?.round !== g.round) {
       try {
@@ -296,8 +352,9 @@ function header(g, title) {
   const usedCount = g.used.length;
   return `
   <header class="bar">
+    ${backButton}
     <div class="bar-title">
-      <button class="eyebrow linkish" data-act="home" aria-label="Back to start">GAME · ${esc(g.code)}</button>
+      <span class="eyebrow">GAME · ${esc(g.code)}</span>
       <h1 class="h-round">${esc(title)}</h1>
     </div>
     ${g.status !== 'lobby' ? `<button class="icon-btn" data-act="used" aria-label="Used words, ${usedCount} so far">${listIcon}</button>` : ''}
@@ -345,7 +402,8 @@ function viewJoin(g) {
   const started = g.status !== 'lobby';
   return `
   <main class="screen">
-    <div class="hero">
+    <header class="bar">${backButton}</header>
+    <div class="hero tight">
       ${logo(140)}
       <h1 class="wordmark small">Samesies</h1>
       <p class="tagline">${esc(g.players[g.hostUid]?.name || 'A friend')} invited you to game <strong>${esc(g.code)}</strong></p>
@@ -397,10 +455,12 @@ function viewRound(g) {
   return `
   <main class="screen">
     ${header(g, `Round ${g.round}`)}
+    ${prev && g.vote?.round === prev.round && !g.vote.result ? voteCard(g) : ''}
     <section class="card center-text">
       ${prev ? `
         <span class="muted">Connect these</span>
-        <div class="word-chips">${prev.words.map((w) => `<span class="word-chip">${esc(w.word)}</span>`).join('')}</div>`
+        <div class="word-chips">${prev.words.map((w) => `<span class="word-chip">${esc(w.word)}</span>`).join('')}</div>
+        ${g.vote?.round === prev.round ? '' : `<button class="linkish close-link" data-act="vote">Close enough? Ask to count it</button>`}`
       : `
         <span class="muted">Round one</span>
         <p class="prompt">Pick any word in the known universe.</p>
@@ -415,7 +475,7 @@ function viewRound(g) {
     : `
       <form class="stack" data-form="word">
         <label for="word" class="label">Your word</label>
-        <input id="word" name="word" class="input big" maxlength="40" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Type it here">
+        <input id="word" name="word" class="input big" maxlength="40" autocomplete="off" autocorrect="on" spellcheck="true" autocapitalize="sentences" placeholder="Type it here">
         <button class="btn primary" ${state.busy ? 'disabled' : ''}>Lock it in</button>
         <span class="fine">Nobody sees your word until everyone’s in.</span>
       </form>`}
@@ -457,9 +517,30 @@ function viewReveal(g, entry) {
         </div>`).join('')}
     </section>
     <div class="row msg">${logo(60)}<span class="muted">${esc(msg)}</span></div>
+    ${g.vote?.round === entry.round ? voteCard(g)
+      : `<button class="btn ${nearlyMatch(entry.words.map((w) => w.word)) ? 'close-hot' : 'soft'}" data-act="vote">${nearlyMatch(entry.words.map((w) => w.word)) ? 'Those look the same. Close enough?' : 'Close enough?'}</button>`}
     <div class="grow"></div>
     <button class="btn primary" data-act="seen" data-round="${entry.round}">On to round ${entry.round + 1}</button>
   </main>`;
+}
+
+function voteCard(g) {
+  const v = g.vote;
+  const asker = esc(g.players[v.by]?.name || 'Someone');
+  if (v.result === 'no') {
+    const naysayer = esc(g.players[Object.keys(v.no)[0]]?.name || 'Someone');
+    return `<section class="vote done"><span class="muted">${naysayer} said not quite, so play on.</span></section>`;
+  }
+  const iVoted = v.yes[state.uid] || v.no[state.uid];
+  const waiting = g.order.filter((u) => !v.yes[u] && !v.no[u]).map((u) => esc(g.players[u].name));
+  return `
+  <section class="vote" aria-live="polite">
+    <span class="vote-title">Close enough?</span>
+    <span class="muted">${v.by === state.uid ? 'You asked' : `${asker} asked`} to count round ${v.round} as a match. Everyone has to agree.</span>
+    ${iVoted
+      ? `<span class="muted small">${waiting.length ? `Waiting on ${waiting.join(', ')}…` : 'Counting…'}</span>`
+      : `<div class="row"><button class="btn primary grow" data-act="yes">Yes, count it</button><button class="btn outline" data-act="no">No</button></div>`}
+  </section>`;
 }
 
 function viewWon(g) {
@@ -469,8 +550,8 @@ function viewWon(g) {
   <main class="screen win">
     <div class="win-top">
       <div class="pop">${logo(190, '#FFFFFF', '#FF6A4D')}</div>
-      <h1 class="win-title">Samesies!</h1>
-      <span class="win-sub">Everyone said</span>
+      <h1 class="win-title">${g.wonBy === 'vote' ? 'Close enough!' : 'Samesies!'}</h1>
+      <span class="win-sub">${g.wonBy === 'vote' ? 'You all agreed on' : 'Everyone said'}</span>
       <div class="win-word">${esc(g.winWord)}</div>
       <span class="win-sub">${esc(nameList)} · ${g.history.length} round${g.history.length === 1 ? '' : 's'}</span>
     </div>
@@ -510,7 +591,7 @@ function currentView() {
   if (!state.uid) return viewLoading();
   if (!state.code) return viewHome();
   if (state.gameMissing) {
-    return `<main class="screen center">${logo(120)}<p class="notice">No game with code ${esc(state.code)}.</p><button class="btn outline" data-act="home">Go to start</button></main>`;
+    return `<main class="screen center"><header class="bar top-left">${backButton}</header>${logo(120)}<p class="notice">No game with code ${esc(state.code)}.</p><button class="btn outline" data-act="home">Go to start</button></main>`;
   }
   const g = state.game;
   if (!g) return viewLoading('Finding your game…');
@@ -583,6 +664,9 @@ $app.addEventListener('click', async (e) => {
   if (act === 'start') startGame();
   if (act === 'nudge') nudge(el.dataset.uid);
   if (act === 'again') playAgain();
+  if (act === 'vote') startVote();
+  if (act === 'yes') castVote(true);
+  if (act === 'no') castVote(false);
   if (act === 'used') { state.showUsed = true; render(); }
   if (act === 'closeused') { state.showUsed = false; render(); }
   if (act === 'seen') { store.set(`seen.${state.game.code}`, Number(el.dataset.round)); render(); }
