@@ -260,3 +260,15 @@ body:has(.win) { background: var(--indigo); }
 .wordmark b { color: var(--indigo); font-weight: 800; }
 .btn.coral { background: var(--coral); color: var(--ink); }
 .win .row .btn { padding: 0 8px; }
+
+/* Daily Words */
+.daily-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left;
+  background: var(--card); border: 2px solid var(--coral); border-radius: 20px; padding: 14px 18px;
+}
+.daily-top { display: flex; justify-content: space-between; width: 100%; }
+.daily-title { font-family: var(--display); font-weight: 800; font-size: 21px; }
+.badge { background: var(--coral); color: var(--ink); font-weight: 700; font-size: 13px; padding: 5px 12px; border-radius: 999px; }
+.rdef { font-size: 15px; color: var(--muted); font-style: italic; }
+.defs { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); text-align: left; width: 100%; }
+.defs strong { color: var(--ink); }

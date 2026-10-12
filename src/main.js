@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import { MIN_PLAYERS, MAX_PLAYERS, makeCode, normalize, cleanWord, isUsed, allMatch, nearlyMatch, commonWord } from './logic.js';
 import { STARTERS } from './starters.js';
+import { DAILY_WORDS } from './dailywords.js';
 import { unlockAudio, isMuted, setMuted, drumroll, closeSting, fanfare, confetti } from './fx.js';
 
 const firebaseConfig = {
@@ -100,7 +101,27 @@ const soundIcon = (off) => `<svg width="22" height="22" viewBox="0 0 24 24" fill
 const closeIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
 
 // ---------- game actions ----------
-async function createGame() {
+// ---------- Daily Words ----------
+// Every day has its own five bonkers words, the same for everyone. Each player in a game is dealt a different one.
+function todayKey(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// The list is shuffled once with a fixed seed, then each day takes the next five, so words don't repeat for weeks.
+const dailyOrder = (() => {
+  let seed = 20261012;
+  const rand = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+  const idx = DAILY_WORDS.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  return idx;
+})();
+
+function dailyWords(key = todayKey()) {
+  const day = Math.round(Date.UTC(...key.split('-').map((n, i) => (i === 1 ? n - 1 : +n))) / 86400000);
+  return Array.from({ length: MAX_PLAYERS }, (_, i) => DAILY_WORDS[dailyOrder[(day * MAX_PLAYERS + i) % dailyOrder.length]]);
+}
+
+async function createGame(opts = {}) {
   const name = cleanWord(state.name);
   if (!name) return fail('Type your name first.');
   state.busy = true; state.error = ''; render();
@@ -125,6 +146,7 @@ async function createGame() {
       used: [],
       winWord: null,
       nudges: {},
+      ...(opts.daily ? { daily: { date: todayKey(), words: dailyWords() } } : {}),
     });
     state.busy = false;
     openGame(code);
@@ -158,7 +180,19 @@ async function joinGame(codeInput, asName) {
 async function startGame() {
   const g = state.game;
   if (g.order.length < MIN_PLAYERS) return;
-  try { await updateDoc(gameRef(g.code), { status: 'playing', round: 1 }); } catch (e) { fail(e); }
+  try {
+    if (g.daily) {
+      // Daily Words: round one is dealt, not typed. Everyone sees their bonkers word, then connects them all.
+      const words = g.order.map((u, i) => ({ uid: u, name: g.players[u].name, word: g.daily.words[i].word, def: g.daily.words[i].def }));
+      await updateDoc(gameRef(g.code), {
+        status: 'playing', round: 2, revealed: 1, submitted: {},
+        history: [{ round: 1, dealt: true, words }],
+        used: [...new Set(words.map((w) => normalize(w.word)))],
+      });
+    } else {
+      await updateDoc(gameRef(g.code), { status: 'playing', round: 1 });
+    }
+  } catch (e) { fail(e); }
 }
 
 async function submitWord(raw) {
@@ -452,6 +486,11 @@ function viewHome() {
       <input id="name" name="name" class="input" autocomplete="nickname" maxlength="40" value="${esc(state.name)}" placeholder="What should we call you?">
       <button class="btn primary" ${state.busy ? 'disabled' : ''}>Start a new game</button>
     </form>
+    <button class="daily-card" data-act="daily" ${state.busy ? 'disabled' : ''}>
+      <span class="daily-top"><span class="eyebrow">DAILY WORDS</span><span class="muted small">${esc(new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</span></span>
+      <span class="daily-title">Play today’s bonkers words</span>
+      <span class="muted small">Everyone’s dealt a different strange word. Connect them all.</span>
+    </button>
     <div class="or"><span></span>or<span></span></div>
     <form class="row" data-form="join">
       <label for="code" class="sr-only">Game code</label>
@@ -500,6 +539,7 @@ function viewLobby(g) {
   <main class="screen">
     ${header(g, 'Getting ready')}
     <section class="card center-text">
+      ${g.daily ? '<span class="badge">Daily Words game</span>' : ''}
       <span class="muted">Invite with this code</span>
       <div class="big-code">${esc(g.code)}</div>
       <button class="btn soft" data-act="share">Share invite link</button>
@@ -532,7 +572,8 @@ function viewRound(g) {
       ${prev ? `
         <span class="muted">Connect these</span>
         <div class="word-chips">${prev.words.map((w) => `<span class="word-chip">${esc(w.word)}</span>`).join('')}</div>
-        ${g.vote?.round === prev.round ? '' : `<button class="linkish close-link" data-act="vote">Close enough? Ask to count it</button>`}`
+        ${prev.dealt ? `<div class="defs">${prev.words.map((w) => `<span><strong>${esc(w.word)}:</strong> ${esc(w.def)}</span>`).join('')}</div>` : ''}
+        ${g.vote?.round === prev.round || prev.dealt ? '' : `<button class="linkish close-link" data-act="vote">Close enough? Ask to count it</button>`}`
       : `
         <span class="muted">Round one</span>
         <p class="prompt">Pick any word in the known universe.</p>
@@ -589,6 +630,7 @@ function viewReveal(g, entry) {
   const msg = groups.length
     ? groups.map((grp) => `${listNames(grp.map((w) => esc(w.name)))} ${grp.length === 2 ? 'both' : 'all'} said <em>${esc(grp[0].word)}</em>!`).join('<br>')
     : '';
+  if (entry.dealt) return viewDealt(g, entry);
   const sub = groups.length
     ? 'So close! Keep going.'
     : (entry.words.length === 2 ? 'Not yet! Next round, connect these two.' : 'Not yet! Next round, connect all of these.');
@@ -610,6 +652,26 @@ function viewReveal(g, entry) {
     </div>
     <div class="grow"></div>
     <button class="btn primary after-reveal" data-act="seen" data-round="${entry.round}">On to round ${entry.round + 1}</button>
+  </main>`;
+}
+
+function viewDealt(g, entry) {
+  return `
+  <main class="screen reveal-screen">
+    ${header(g, 'Bonkers words!')}
+    <section class="stack reveal">
+      ${entry.words.map((w) => `
+        <div class="reveal-card">
+          <span class="rname">${esc(w.name)} got</span>
+          <span class="rword">${esc(w.word)}</span>
+          <span class="rdef">${esc(w.def)}</span>
+        </div>`).join('')}
+    </section>
+    <div class="after-reveal stack">
+      <div class="row msg">${logo(60)}<span class="muted">Everyone got a different word. Next round, find one word that connects them all.</span></div>
+    </div>
+    <div class="grow"></div>
+    <button class="btn primary after-reveal" data-act="seen" data-round="${entry.round}">Let’s connect them</button>
   </main>`;
 }
 
@@ -796,6 +858,7 @@ $app.addEventListener('click', async (e) => {
   if (act === 'again') playAgain();
   if (act === 'vote') startVote();
   if (act === 'sharegame') shareGame();
+  if (act === 'daily') createGame({ daily: true });
   if (act === 'newcrew') newCrew();
   if (act === 'mute') { setMuted(!isMuted()); render(); }
   if (act === 'starter') {
