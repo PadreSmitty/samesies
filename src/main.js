@@ -108,7 +108,7 @@ const closeIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" s
 
 // ---------- game actions ----------
 // ---------- Daily Words ----------
-// Every day has its own five bonkers words, the same for everyone. Each player in a game is dealt a different one.
+// Every day has its own five weird words, the same for everyone. Each player in a game is dealt a different one.
 function todayKey(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -188,7 +188,7 @@ async function startGame() {
   if (g.order.length < MIN_PLAYERS) return;
   try {
     if (g.daily) {
-      // Daily Words: round one is dealt, not typed. Everyone sees their bonkers word, then connects them all.
+      // Daily Words: round one is dealt, not typed. Everyone sees their weird word, then connects them all.
       const words = g.order.map((u, i) => ({ uid: u, name: g.players[u].name, word: g.daily.words[i].word, def: g.daily.words[i].def }));
       await updateDoc(gameRef(g.code), {
         status: 'playing', round: 2, revealed: 1, submitted: {},
@@ -572,8 +572,8 @@ function viewHome() {
       <button class="btn primary" ${state.busy ? 'disabled' : ''}>Start a new game</button>
     </form>
     <button class="daily-card" data-act="daily" ${state.busy ? 'disabled' : ''}>
-      <span class="daily-top"><span class="eyebrow">DAILY WORDS</span><span class="muted small">${esc(new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</span></span>
-      <span class="daily-title">Play today’s bonkers words</span>
+      <span class="daily-top"><span class="eyebrow">WEIRD DAILY WORDS</span><span class="muted small">${esc(new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</span></span>
+      <span class="daily-title">Scared? You scared.</span>
       <span class="muted small">Everyone’s dealt a different strange word. Connect them all.</span>
     </button>
     <div class="or"><span></span>or<span></span></div>
@@ -624,7 +624,7 @@ function viewLobby(g) {
   <main class="screen">
     ${header(g, 'Getting ready')}
     <section class="card center-text">
-      ${g.daily ? '<span class="badge">Daily Words game</span>' : ''}
+      ${g.daily ? '<span class="badge">Weird Daily Words game</span>' : ''}
       <span class="muted">Invite with this code</span>
       <div class="big-code">${esc(g.code)}</div>
       <button class="btn soft" data-act="share">Share invite link</button>
@@ -746,7 +746,7 @@ function viewReveal(g, entry) {
 function viewDealt(g, entry) {
   return `
   <main class="screen reveal-screen">
-    ${header(g, 'Bonkers words!')}
+    ${header(g, 'Weird words!')}
     <section class="stack reveal">
       ${entry.words.map((w) => `
         <div class="reveal-card" style="--pc:${colorOf(g, w.uid)}">

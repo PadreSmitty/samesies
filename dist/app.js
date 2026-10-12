@@ -464,8 +464,8 @@ Play with us:`}async function oI(){let n=T.game,e=location.origin+location.pathn
       <button class="btn primary" ${T.busy?"disabled":""}>Start a new game</button>
     </form>
     <button class="daily-card" data-act="daily" ${T.busy?"disabled":""}>
-      <span class="daily-top"><span class="eyebrow">DAILY WORDS</span><span class="muted small">${U(new Date().toLocaleDateString(void 0,{month:"short",day:"numeric"}))}</span></span>
-      <span class="daily-title">Play today\u2019s bonkers words</span>
+      <span class="daily-top"><span class="eyebrow">WEIRD DAILY WORDS</span><span class="muted small">${U(new Date().toLocaleDateString(void 0,{month:"short",day:"numeric"}))}</span></span>
+      <span class="daily-title">Scared? You scared.</span>
       <span class="muted small">Everyone\u2019s dealt a different strange word. Connect them all.</span>
     </button>
     <div class="or"><span></span>or<span></span></div>
@@ -498,7 +498,7 @@ Play with us:`}async function oI(){let n=T.game,e=location.origin+location.pathn
   <main class="screen">
     ${Io(n,"Getting ready")}
     <section class="card center-text">
-      ${n.daily?'<span class="badge">Daily Words game</span>':""}
+      ${n.daily?'<span class="badge">Weird Daily Words game</span>':""}
       <span class="muted">Invite with this code</span>
       <div class="big-code">${U(n.code)}</div>
       <button class="btn soft" data-act="share">Share invite link</button>
@@ -571,7 +571,7 @@ Play with us:`}async function oI(){let n=T.game,e=location.origin+location.pathn
     <button class="btn primary after-reveal" data-act="seen" data-round="${e.round}">On to round ${e.round+1}</button>
   </main>`}function wI(n,e){return`
   <main class="screen reveal-screen">
-    ${Io(n,"Bonkers words!")}
+    ${Io(n,"Weird words!")}
     <section class="stack reveal">
       ${e.words.map(t=>`
         <div class="reveal-card" style="--pc:${tr(n,t.uid)}">
