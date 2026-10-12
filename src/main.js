@@ -7,16 +7,8 @@ import {
 import { MIN_PLAYERS, MAX_PLAYERS, makeCode, normalize, cleanWord, isUsed, allMatch, nearlyMatch, commonWord } from './logic.js';
 import { STARTERS } from './starters.js';
 import { DAILY_WORDS } from './dailywords.js';
+import { firebaseConfig } from './firebase-config.js';
 import { unlockAudio, isMuted, setMuted, drumroll, closeSting, fanfare, confetti } from './fx.js';
-
-const firebaseConfig = {
-  apiKey: 'AIzaSyAEbf9VBdvXdHUSlH0rZgHL7SmvXyAn_nM',
-  authDomain: 'thesamesiesgame.firebaseapp.com',
-  projectId: 'thesamesiesgame',
-  storageBucket: 'thesamesiesgame.firebasestorage.app',
-  messagingSenderId: '120235814862',
-  appId: '1:120235814862:web:4f5762bc1a08d2f228059f',
-};
 
 const fb = initializeApp(firebaseConfig);
 const auth = getAuth(fb);

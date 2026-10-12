@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>Brainsmith stats</title>
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --ground:#F3F4FE; --card:#FFFFFF; --ink:#1A1B3D; --muted:#5B5E85; --line:#DCDEF5; --mark:#4B4DDB; color-scheme: light; }
+    @media (prefers-color-scheme: dark) { :root { --ground:#121329; --card:#1D1F3F; --ink:#F1F2FF; --muted:#A9ACD6; --line:#30335C; --mark:#8587FF; color-scheme: dark; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--ground); color: var(--ink); font-family: 'DM Sans', system-ui, sans-serif; }
+    main { max-width: 520px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 28px) 16px 40px; display: flex; flex-direction: column; gap: 18px; }
+    h1 { margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 32px; letter-spacing: -1px; }
+    h1 b { color: var(--mark); font-weight: 800; }
+    h2 { margin: 0 0 8px; font-size: 14px; letter-spacing: 1.4px; color: var(--muted); }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    #status { color: var(--muted); font-size: 14px; }
+    .key { display: inline-block; margin-top: 8px; font-size: 13px; word-break: break-all; }
+    button { font: inherit; font-weight: 700; color: var(--mark); background: var(--card); border: none; border-radius: 12px; height: 40px; padding: 0 14px; cursor: pointer; }
+    #tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .tile { background: var(--card); border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+    .tile-label { font-size: 13px; font-weight: 700; color: var(--muted); }
+    .tile-value { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 32px; }
+    .tile-note { font-size: 13px; color: var(--muted); }
+    .panel { background: var(--card); border-radius: 18px; padding: 16px; }
+    .mark { fill: var(--mark); }
+    .bar:hover .mark, .bar:focus .mark { opacity: 0.8; }
+    .bar:focus { outline: none; }
+    .axis { fill: var(--muted); font-size: 11px; font-family: 'DM Sans', sans-serif; }
+    .base { stroke: var(--line); stroke-width: 1; }
+    #tip { position: absolute; background: var(--ink); color: var(--ground); font-size: 13px; padding: 6px 10px; border-radius: 8px; pointer-events: none; width: 140px; text-align: center; }
+    details summary { cursor: pointer; color: var(--muted); font-size: 14px; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+    td, th { text-align: left; padding: 4px 0; border-bottom: 1px solid var(--line); }
+    td:last-child, th:last-child { text-align: right; }
+    .fine { color: var(--muted); font-size: 13px; text-align: center; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="row"><h1>Brain<b>smith</b> stats</h1><button id="refresh">Refresh</button></div>
+    <p id="status">Loading…</p>
+    <section id="tiles"></section>
+    <section class="panel">
+      <h2>GAMES STARTED PER DAY · LAST 14 DAYS</h2>
+      <div id="chart"></div>
+      <details><summary>Show as a table</summary><table id="table"></table></details>
+    </section>
+    <p class="fine" id="key"></p>
+    <p class="fine">Totals only. Players are counted by device, so one person on two phones counts twice.</p>
+  </main>
+  <div id="tip" hidden></div>
+  <script type="module" src="dist/stats.js"></script>
+</body>
+</html>
