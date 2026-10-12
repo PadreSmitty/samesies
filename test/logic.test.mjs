@@ -27,3 +27,8 @@ assert.ok(!nearlyMatch(['Border', 'Border', 'Wall']));
 assert.ok(!nearlyMatch(['Fence', 'fences']), 'exact match is a win, not a near match');
 assert.equal(commonWord(['Tennessee', 'Tennesse', 'Tennessee']), 'Tennessee');
 console.log('close-match tests passed');
+eq('running', 'run'); eq('Baked', 'bake'); eq('baking', 'bake'); eq('jumped', 'jump'); eq('played', 'play');
+eq('hoping', 'hope'); eq('hopping', 'hop'); eq('wedding', 'wed'); eq('Fishing', 'fish'); eq('falling', 'fall');
+ne('hoping', 'hop'); ne('king', 'k'); ne('red', 'r'); ne('bleed', 'ble'); ne('string', 'str'); ne('cat', 'car');
+eq('Bumbershoot', 'bumbershoots'); eq('Fence', 'fences');
+console.log('word-ending tests passed');

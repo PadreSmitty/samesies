@@ -20,6 +20,19 @@ function singular(w) {
   return w;
 }
 
+const VOWEL = /[aeiouy]/;
+// "running" and "run", "baked" and "bake", "jumped" and "jump" all count as the same word.
+// Careful on purpose: short words (king, red, bleed) are left alone so they never collide.
+function verbBase(w) {
+  const m = w.match(/^(.+?)(ing|ed)$/);
+  if (!m) return w;
+  let stem = m[1];
+  if (stem.length < 3 || !VOWEL.test(stem) || stem.endsWith('e')) return w;
+  if (/([b-df-hj-np-rtv-z])\1$/.test(stem) && !/(ll|ss|zz)$/.test(stem)) return stem.slice(0, -1); // running -> run
+  if (stem.length === 3 && /[^aeiou][aeiou][^aeiouwxy]$/.test(stem)) stem += 'e'; // baking -> bake
+  return stem;
+}
+
 // "  The Borders! " and "border" both become "border"; "Adam & Eve" stays distinct from "Adam".
 export function normalize(word) {
   return String(word)
@@ -31,6 +44,7 @@ export function normalize(word) {
     .filter(Boolean)
     .filter((w, i, all) => !(i === 0 && all.length > 1 && (w === 'the' || w === 'a' || w === 'an')))
     .map(singular)
+    .map(verbBase)
     .join(' ');
 }
 

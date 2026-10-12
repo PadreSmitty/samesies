@@ -6,7 +6,7 @@ Everyone secretly picks a word. When the last person locks in, all the words are
 Next round, everyone picks a word that connects the words just revealed. Keep going until everyone
 says the same word: **Forged!** Words can never be reused.
 
-(Formerly called Samesies. The repo and web address keep the old name so links people already saved still work.)
+A Padre Smitty Games game. See ORIGIN.md for its history. (Formerly called Samesies. The repo and web address keep the old name so links people already saved still work.)
 
 ## How it's built
 

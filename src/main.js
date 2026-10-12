@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, runTransaction,
-  collection, getDocs, serverTimestamp,
+  collection, getDocs, serverTimestamp, deleteField,
 } from 'firebase/firestore';
 import { MIN_PLAYERS, MAX_PLAYERS, makeCode, normalize, cleanWord, isUsed, allMatch, nearlyMatch, commonWord } from './logic.js';
 import { STARTERS } from './starters.js';
@@ -41,6 +41,8 @@ const state = {
   gameMissing: false,
   mySub: null, // { round, word }
   showUsed: false,
+  showGames: false,
+  summaries: {}, // code -> short description for the Your games list
   busy: false,
   error: '',
   toast: '',
@@ -52,6 +54,10 @@ const followed = new Set();
 const nudgeCooldown = {};
 
 // ---------- helpers ----------
+// Each player gets their own color, in the order they joined.
+const PLAYER_COLORS = ['#4B4DDB', '#FF6A4D', '#1FB895', '#FFB020', '#E84D9A'];
+const colorOf = (g, uid) => PLAYER_COLORS[Math.max(0, g.order.indexOf(uid)) % PLAYER_COLORS.length];
+const REACTIONS = ['😂', '🤯', '🔥', '❤️'];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const gameRef = (code) => doc(db, 'games', code);
 const subRef = (code, round, uid) => doc(db, 'games', code, 'rounds', String(round), 'subs', uid);
@@ -384,6 +390,84 @@ async function newCrew() {
   createGame();
 }
 
+// ---------- your games ----------
+function describeGame(g) {
+  const others = g.order.filter((u) => u !== state.uid).map((u) => g.players[u]?.name).filter(Boolean);
+  const with_ = others.length ? `With ${listNames(others)}` : 'Just you so far';
+  if (!g.players[state.uid]) return { with_, status: g.removed?.includes(state.uid) ? 'You were removed' : 'Not in this game', tone: 'muted' };
+  if (g.status === 'lobby') return { with_, status: g.hostUid === state.uid ? 'Ready when you are: start it!' : 'Waiting to start', tone: g.hostUid === state.uid ? 'hot' : 'muted' };
+  if (g.status === 'won') return { with_, status: `${g.wonBy === 'vote' ? 'Close enough' : 'Forged'}: ${g.winWord}`, tone: 'done' };
+  if (!g.submitted?.[state.uid]) return { with_, status: `Your turn · round ${g.round}`, tone: 'hot' };
+  const waiting = g.order.filter((u) => !g.submitted?.[u]).map((u) => g.players[u].name);
+  return { with_, status: waiting.length ? `Waiting on ${listNames(waiting)}` : 'Revealing…', tone: 'muted' };
+}
+
+async function loadSummaries() {
+  const games = store.get('games', []);
+  await Promise.all(games.map(async ({ code }) => {
+    try {
+      const snap = await getDoc(gameRef(code));
+      state.summaries[code] = snap.exists() ? describeGame(snap.data()) : { with_: 'Game ended', status: 'No longer around', tone: 'muted', gone: true };
+    } catch { /* offline: keep what we had */ }
+  }));
+  render();
+}
+
+function forgetGame(code) {
+  store.set('games', store.get('games', []).filter((g) => g.code !== code));
+  delete state.summaries[code];
+  render();
+}
+
+// ---------- remove a stuck player ----------
+async function removePlayer(uid) {
+  const g = state.game;
+  const name = g.players[uid]?.name || 'this player';
+  if (!confirm(`Remove ${name} from the game? Everyone else can keep playing.`)) return;
+  try {
+    await runTransaction(db, async (tx) => {
+      const cur = (await tx.get(gameRef(g.code))).data();
+      if (!cur.players[uid] || cur.order.length <= MIN_PLAYERS) return;
+      const players = { ...cur.players }; delete players[uid];
+      const order = cur.order.filter((u) => u !== uid);
+      const submitted = { ...cur.submitted }; delete submitted[uid];
+      const everyone = cur.status === 'playing' && order.every((u) => submitted[u]);
+      tx.update(gameRef(g.code), {
+        players, order, submitted,
+        removed: [...(cur.removed || []), uid],
+        ...(cur.hostUid === uid ? { hostUid: order[0] } : {}),
+        ...(everyone ? { revealed: cur.round } : {}),
+      });
+    });
+    toast(`${name} was removed.`);
+  } catch (e) { fail(e); }
+}
+
+// ---------- reactions ----------
+async function react(round, target, emoji) {
+  const g = state.game;
+  const key = `${round}_${target}`;
+  const mine = g.reactions?.[key]?.[state.uid];
+  try {
+    await updateDoc(gameRef(g.code), { [`reactions.${key}.${state.uid}`]: mine === emoji ? deleteField() : emoji });
+  } catch (e) { fail(e); }
+}
+
+function reactionRow(g, round, uid) {
+  const r = g.reactions?.[`${round}_${uid}`] || {};
+  const counts = {};
+  Object.values(r).forEach((e) => { counts[e] = (counts[e] || 0) + 1; });
+  return `<div class="reacts">${REACTIONS.map((e) => `<button class="react${r[state.uid] === e ? ' mine' : ''}" data-act="react" data-round="${round}" data-uid="${esc(uid)}" data-emoji="${e}" aria-label="React ${e}${counts[e] ? `, ${counts[e]} so far` : ''}">${e}${counts[e] ? `<span>${counts[e]}</span>` : ''}</button>`).join('')}</div>`;
+}
+
+function reactionBadges(g, round, uid) {
+  const r = g.reactions?.[`${round}_${uid}`] || {};
+  const counts = {};
+  Object.values(r).forEach((e) => { counts[e] = (counts[e] || 0) + 1; });
+  const parts = Object.entries(counts).map(([e, n]) => `${e}${n > 1 ? n : ''}`);
+  return parts.length ? `<span class="chip-reacts">${parts.join(' ')}</span>` : '';
+}
+
 // ---------- subscriptions ----------
 function openGame(code) {
   if (unsubGame) unsubGame();
@@ -450,6 +534,7 @@ function leaveGame() {
   state.code = null; state.game = null; state.gameMissing = false; state.error = '';
   setUrl(null);
   render();
+  loadSummaries();
 }
 
 // ---------- views ----------
@@ -498,12 +583,12 @@ function viewHome() {
       <button class="btn outline" ${state.busy ? 'disabled' : ''}>Join</button>
     </form>
     ${state.error ? `<p class="error" role="alert">${esc(state.error)}</p>` : ''}
-    ${games.length ? `
-      <div class="recent">
-        <span class="eyebrow">YOUR GAMES</span>
-        <div class="chips">${games.map((x) => `<button class="chip" data-act="open" data-code="${esc(x.code)}">${esc(x.code)}</button>`).join('')}</div>
-      </div>` : ''}
+    ${games.length ? (() => {
+      const turns = games.filter((x) => state.summaries[x.code]?.tone === 'hot').length;
+      return `<button class="btn soft games-btn" data-act="games">Your games (${games.length})${turns ? `<span class="turn-pill">${turns} need you</span>` : ''}</button>`;
+    })() : ''}
     <p class="fine">2 to 5 players · no sign-up · <button class="linkish inline-link" data-act="tour">How to play</button></p>
+    <p class="fine maker">A Padre Smitty Games game</p>
   </main>`;
 }
 
@@ -548,7 +633,7 @@ function viewLobby(g) {
       <span class="eyebrow">PLAYERS · ${g.order.length} OF ${MAX_PLAYERS}</span>
       ${g.order.map((u) => `
         <div class="player">
-          <div class="dot done">${checkIcon}</div>
+          <div class="dot done" style="background:${colorOf(g, u)}">${checkIcon}</div>
           <span class="pname">${esc(g.players[u].name)}${u === state.uid ? ' (you)' : ''}</span>
           ${u === g.hostUid ? '<span class="muted small">Host</span>' : ''}
         </div>`).join('')}
@@ -571,7 +656,7 @@ function viewRound(g) {
     <section class="card center-text">
       ${prev ? `
         <span class="muted">Connect these</span>
-        <div class="word-chips">${prev.words.map((w) => `<span class="word-chip">${esc(w.word)}</span>`).join('')}</div>
+        <div class="word-chips">${prev.words.map((w) => `<span class="word-chip" style="--pc:${colorOf(g, w.uid)}">${esc(w.word)}${reactionBadges(g, prev.round, w.uid)}</span>`).join('')}</div>
         ${prev.dealt ? `<div class="defs">${prev.words.map((w) => `<span><strong>${esc(w.word)}:</strong> ${esc(w.def)}</span>`).join('')}</div>` : ''}
         ${g.vote?.round === prev.round || prev.dealt ? '' : `<button class="linkish close-link" data-act="vote">Close enough? Ask to count it</button>`}`
       : `
@@ -600,13 +685,15 @@ function viewRound(g) {
       ${g.order.map((u) => {
         const done = !!g.submitted?.[u];
         const me = u === state.uid;
+        // The host can drop someone who wandered off; if the host is the one missing, anyone can.
+        const canRemove = !me && !done && g.order.length > MIN_PLAYERS && (g.hostUid === state.uid || u === g.hostUid);
         return `
         <div class="player">
-          ${done ? `<div class="dot done">${checkIcon}</div>` : '<div class="dot"></div>'}
+          ${done ? `<div class="dot done" style="background:${colorOf(g, u)}">${checkIcon}</div>` : `<div class="dot" style="border-color:${colorOf(g, u)}"></div>`}
           <span class="pname">${esc(g.players[u].name)}${me ? ' (you)' : ''}</span>
           ${done ? '<span class="muted small">Locked in</span>'
             : me ? '<span class="muted small">Thinking…</span>'
-            : `<button class="btn nudge" data-act="nudge" data-uid="${esc(u)}">Nudge</button>`}
+            : `<button class="btn nudge" data-act="nudge" data-uid="${esc(u)}">Nudge</button>${canRemove ? `<button class="icon-btn soft remove" data-act="remove" data-uid="${esc(u)}" aria-label="Remove ${esc(g.players[u].name)} from the game">${closeIcon}</button>` : ''}`}
         </div>`;
       }).join('')}
     </section>
@@ -639,9 +726,10 @@ function viewReveal(g, entry) {
     ${header(g, `Round ${entry.round} is in!`)}
     <section class="stack reveal">
       ${entry.words.map((w) => `
-        <div class="reveal-card${matched.has(w.uid) ? ' matched' : ''}">
+        <div class="reveal-card${matched.has(w.uid) ? ' matched' : ''}" style="--pc:${colorOf(g, w.uid)}">
           <span class="rname">${esc(w.name)}</span>
           <span class="rword">${esc(w.word)}</span>
+          ${reactionRow(g, entry.round, w.uid)}
         </div>`).join('')}
     </section>
     <div class="after-reveal stack">
@@ -661,7 +749,7 @@ function viewDealt(g, entry) {
     ${header(g, 'Bonkers words!')}
     <section class="stack reveal">
       ${entry.words.map((w) => `
-        <div class="reveal-card">
+        <div class="reveal-card" style="--pc:${colorOf(g, w.uid)}">
           <span class="rname">${esc(w.name)} got</span>
           <span class="rword">${esc(w.word)}</span>
           <span class="rdef">${esc(w.def)}</span>
@@ -746,6 +834,31 @@ function viewTour() {
   </div>`;
 }
 
+function viewGamesSheet() {
+  const games = store.get('games', []);
+  return `
+  <div class="sheet-backdrop" data-act="closegames">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="games-title" data-stop>
+      <div class="grabber"></div>
+      <div class="row between">
+        <h2 id="games-title" class="h-sheet">Your games</h2>
+        <button class="icon-btn soft" data-act="closegames" aria-label="Close">${closeIcon}</button>
+      </div>
+      ${games.length ? games.map(({ code }) => {
+        const d = state.summaries[code];
+        return `
+        <div class="game-row">
+          <button class="game-open" data-act="${d?.gone ? 'forget' : 'open'}" data-code="${esc(code)}">
+            <span class="game-with">${esc(d ? d.with_ : 'Loading…')}</span>
+            <span class="game-status ${d?.tone || ''}">${esc(d ? d.status : code)}</span>
+          </button>
+          <button class="icon-btn soft" data-act="forget" data-code="${esc(code)}" aria-label="Remove game ${esc(code)} from this list">${closeIcon}</button>
+        </div>`;
+      }).join('') : '<p class="muted">No games yet.</p>'}
+    </div>
+  </div>`;
+}
+
 function viewUsedSheet(g) {
   return `
   <div class="sheet-backdrop" data-act="closeused">
@@ -774,6 +887,9 @@ function currentView() {
   }
   const g = state.game;
   if (!g) return viewLoading('Finding your game…');
+  if (!g.players[state.uid] && g.removed?.includes(state.uid)) {
+    return `<main class="screen center"><header class="bar top-left">${backButton}</header>${logo(120)}<p class="notice">You were taken out of game ${esc(g.code)} so the others could keep playing.</p><button class="btn outline" data-act="home">Go to start</button></main>`;
+  }
   if (!g.players[state.uid]) return viewJoin(g);
   if (g.status === 'lobby') return viewLobby(g);
   if (g.status === 'won') return viewWon(g);
@@ -796,6 +912,7 @@ function render() {
   const toastWas = $app.querySelector('.toast')?.textContent;
   $app.innerHTML = currentView()
     + (state.showUsed && g ? viewUsedSheet(g) : '')
+    + (state.showGames && !state.code ? viewGamesSheet() : '')
     + (state.tour !== null && !state.code ? viewTour() : '')
     + (state.toast ? `<div class="toast" role="status">${esc(state.toast)}</div>` : '');
 
@@ -852,12 +969,17 @@ $app.addEventListener('click', async (e) => {
   if (el.dataset.act === 'closeused' && e.target.closest('[data-stop]') && !e.target.closest('button')) return;
   const act = el.dataset.act;
   if (act === 'home') leaveGame();
-  if (act === 'open') openGame(el.dataset.code);
+  if (act === 'open') { state.showGames = false; openGame(el.dataset.code); }
   if (act === 'start') startGame();
   if (act === 'nudge') nudge(el.dataset.uid);
   if (act === 'again') playAgain();
   if (act === 'vote') startVote();
   if (act === 'sharegame') shareGame();
+  if (act === 'games') { state.showGames = true; render(); loadSummaries(); }
+  if (act === 'closegames' && !(e.target.closest('[data-stop]') && !e.target.closest('button'))) { state.showGames = false; render(); }
+  if (act === 'forget') forgetGame(el.dataset.code);
+  if (act === 'remove') removePlayer(el.dataset.uid);
+  if (act === 'react') react(Number(el.dataset.round), el.dataset.uid, el.dataset.emoji);
   if (act === 'daily') createGame({ daily: true });
   if (act === 'newcrew') newCrew();
   if (act === 'mute') { setMuted(!isMuted()); render(); }
@@ -893,6 +1015,7 @@ document.addEventListener('pointerdown', unlockAudio, { capture: true });
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && state.showUsed) { state.showUsed = false; render(); }
+  if (e.key === 'Escape' && state.showGames) { state.showGames = false; render(); }
   if (e.key === 'Escape' && state.tour !== null) { state.tour = null; store.set('toured', true); render(); }
 });
 
@@ -902,7 +1025,7 @@ onAuthStateChanged(auth, (user) => {
   if (user) {
     state.uid = user.uid;
     if (state.code && !unsubGame) openGame(state.code);
-    else render();
+    else { render(); loadSummaries(); }
   }
 });
 signInAnonymously(auth).catch((e) => {
