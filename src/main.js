@@ -574,7 +574,7 @@ function viewHome() {
     <button class="daily-card" data-act="daily" ${state.busy ? 'disabled' : ''}>
       <span class="daily-top"><span class="eyebrow">WEIRD DAILY WORDS</span><span class="muted small">${esc(new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</span></span>
       <span class="daily-title">Scared? You scared.</span>
-      <span class="muted small">Everyone’s dealt a different strange word. Connect them all.</span>
+      <span class="muted small">Start with a redonkulous word</span>
     </button>
     <div class="or"><span></span>or<span></span></div>
     <form class="row" data-form="join">

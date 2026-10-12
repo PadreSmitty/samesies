@@ -466,7 +466,7 @@ Play with us:`}async function oI(){let n=T.game,e=location.origin+location.pathn
     <button class="daily-card" data-act="daily" ${T.busy?"disabled":""}>
       <span class="daily-top"><span class="eyebrow">WEIRD DAILY WORDS</span><span class="muted small">${U(new Date().toLocaleDateString(void 0,{month:"short",day:"numeric"}))}</span></span>
       <span class="daily-title">Scared? You scared.</span>
-      <span class="muted small">Everyone\u2019s dealt a different strange word. Connect them all.</span>
+      <span class="muted small">Start with a redonkulous word</span>
     </button>
     <div class="or"><span></span>or<span></span></div>
     <form class="row" data-form="join">
