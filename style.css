@@ -270,5 +270,5 @@ body:has(.win) { background: var(--indigo); }
 .daily-title { font-family: var(--display); font-weight: 800; font-size: 21px; }
 .badge { background: var(--coral); color: var(--ink); font-weight: 700; font-size: 13px; padding: 5px 12px; border-radius: 999px; }
 .rdef { font-size: 15px; color: var(--muted); font-style: italic; }
-.defs { display: flex; flex-direction: column; gap: 4px; font-size: 15px; color: var(--muted); text-align: center; width: 100%; }
+.defs { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); text-align: left; width: 100%; }
 .defs strong { color: var(--ink); }
