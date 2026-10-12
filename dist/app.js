@@ -477,7 +477,7 @@ Play with us:`}async function oI(){let n=T.game,e=location.origin+location.pathn
     ${T.error?`<p class="error" role="alert">${U(T.error)}</p>`:""}
     ${n.length?(()=>{let e=n.filter(t=>T.summaries[t.code]?.tone==="hot").length;return`<button class="btn soft games-btn" data-act="games">Your games (${n.length})${e?`<span class="turn-pill">${e} need you</span>`:""}</button>`})():""}
     <p class="fine">2 to 5 players \xB7 no sign-up \xB7 <button class="linkish inline-link" data-act="tour">How to play</button></p>
-    <p class="fine maker">A Padre Smitty Games game</p>
+    <p class="fine maker">a Padre Smitty creation</p>
   </main>`}function mI(n){let e=n.order.length>=5,t=n.status!=="lobby";return`
   <main class="screen">
     <header class="bar">${_o}</header>

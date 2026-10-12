@@ -588,7 +588,7 @@ function viewHome() {
       return `<button class="btn soft games-btn" data-act="games">Your games (${games.length})${turns ? `<span class="turn-pill">${turns} need you</span>` : ''}</button>`;
     })() : ''}
     <p class="fine">2 to 5 players · no sign-up · <button class="linkish inline-link" data-act="tour">How to play</button></p>
-    <p class="fine maker">A Padre Smitty Games game</p>
+    <p class="fine maker">a Padre Smitty creation</p>
   </main>`;
 }
 
