@@ -1,10 +1,12 @@
-# Samesies
+# Brainsmith
 
 A word game for 2 to 5 players. Two words in. Meet in the middle.
 
 Everyone secretly picks a word. When the last person locks in, all the words are revealed at once.
 Next round, everyone picks a word that connects the words just revealed. Keep going until everyone
-says the same word: **Samesies!** Words can never be reused.
+says the same word: **Forged!** Words can never be reused.
+
+(Formerly called Samesies. The repo and web address keep the old name so links people already saved still work.)
 
 ## How it's built
 

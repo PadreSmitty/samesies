@@ -47,6 +47,7 @@ const state = {
 let unsubGame = null;
 let resolving = false;
 let lastVoteSeen = null;
+const followed = new Set();
 const nudgeCooldown = {};
 
 // ---------- helpers ----------
@@ -80,7 +81,8 @@ function fail(err) {
   render();
 }
 
-// Two overlapping circles, each rippling outward in fading rings: rounds of guesses meeting in the middle.
+// Two overlapping circles, each rippling outward in fading rings: rounds of guesses meeting in the middle,
+// with a spark where the two minds meet.
 const logo = (size = 170, a = '#4B4DDB', b = '#FF6A4D') =>
   `<svg width="${size}" height="${Math.round(size * 0.62)}" viewBox="0 -2 200 124" aria-hidden="true">`
   + `<circle cx="76" cy="60" r="58" fill="none" stroke="${a}" stroke-width="3.5" opacity="0.18"/>`
@@ -88,7 +90,8 @@ const logo = (size = 170, a = '#4B4DDB', b = '#FF6A4D') =>
   + `<circle cx="76" cy="60" r="44" fill="none" stroke="${a}" stroke-width="4.5" opacity="0.42"/>`
   + `<circle cx="124" cy="60" r="44" fill="none" stroke="${b}" stroke-width="4.5" opacity="0.42"/>`
   + `<circle cx="76" cy="60" r="30" fill="${a}" opacity="0.9"/>`
-  + `<circle cx="124" cy="60" r="30" fill="${b}" opacity="0.85"/></svg>`;
+  + `<circle cx="124" cy="60" r="30" fill="${b}" opacity="0.85"/>`
+  + `<path d="M100 47 L101.9 58.1 L107 60 L101.9 61.9 L100 73 L98.1 61.9 L93 60 L98.1 58.1Z" fill="#FFFFFF"/></svg>`;
 const listIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>`;
 const checkIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>`;
 const backIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>`;
@@ -128,8 +131,8 @@ async function createGame() {
   } catch (e) { fail(e); }
 }
 
-async function joinGame(codeInput) {
-  const name = cleanWord(state.name);
+async function joinGame(codeInput, asName) {
+  const name = cleanWord(asName || state.name);
   const code = String(codeInput || '').trim().toUpperCase();
   if (!name) return fail('Type your name first.');
   if (!/^[A-Z]{4}$/.test(code)) return fail('Game codes are 4 letters.');
@@ -287,10 +290,64 @@ async function playAgain() {
       players: { [state.uid]: { name: old.players[state.uid].name, joinedAt: Date.now() } },
       order: [state.uid], round: 1, revealed: 0, submitted: {}, history: [], used: [], winWord: null, nudges: {},
     });
+    followed.add(code);
     await updateDoc(gameRef(old.code), { next: code });
     state.busy = false;
     openGame(code);
   } catch (e) { fail(e); }
+}
+
+async function followRematch(old) {
+  const code = old.next;
+  try {
+    const snap = await getDoc(gameRef(code));
+    const next = snap.exists() ? snap.data() : null;
+    if (!next) return render();
+    if (!next.players[state.uid]) {
+      if (next.status !== 'lobby' || next.order.length >= MAX_PLAYERS) return render(); // the "Join the next game" button stays
+      await runTransaction(db, async (tx) => {
+        const cur = (await tx.get(gameRef(code))).data();
+        if (cur.players[state.uid] || cur.status !== 'lobby' || cur.order.length >= MAX_PLAYERS) return;
+        tx.update(gameRef(code), {
+          [`players.${state.uid}`]: { name: old.players[state.uid].name, joinedAt: Date.now() },
+          order: [...cur.order, state.uid],
+        });
+      });
+      toast(`${next.players[next.hostUid]?.name || 'Someone'} started a rematch. You're in!`);
+    }
+    openGame(code);
+  } catch { render(); }
+}
+
+// The whole game as text with emoji, for pasting into a group chat.
+function shareText(g) {
+  const lines = g.history.map((h, i) => {
+    const counts = {};
+    h.words.forEach((w) => { const k = normalize(w.word); counts[k] = (counts[k] || 0) + 1; });
+    const last = i === g.history.length - 1;
+    const dots = h.words.map((w) => (last ? '🟣' : counts[normalize(w.word)] > 1 ? '🟠' : '⚪')).join('');
+    return `${dots} ${h.words.map((w) => w.word).join(' · ')}`;
+  });
+  const rounds = `${g.history.length} round${g.history.length === 1 ? '' : 's'}`;
+  const head = g.wonBy === 'vote' ? `🧠 Brainsmith: close enough on "${g.winWord}" in ${rounds}!` : `🧠 Brainsmith: we forged "${g.winWord}" in ${rounds}!`;
+  return `${head}\n\n${lines.join('\n')}\n\nPlay with us:`;
+}
+
+async function shareGame() {
+  const g = state.game;
+  const url = location.origin + location.pathname;
+  const text = shareText(g);
+  try {
+    if (navigator.share) await navigator.share({ title: 'Brainsmith', text, url });
+    else { await navigator.clipboard.writeText(`${text} ${url}`); toast('Copied! Paste it in your group text.'); }
+  } catch { /* share sheet dismissed */ }
+}
+
+async function newCrew() {
+  const g = state.game;
+  if (!cleanWord(state.name)) state.name = g.players[state.uid]?.name || '';
+  leaveGame();
+  createGame();
 }
 
 // ---------- subscriptions ----------
@@ -318,6 +375,13 @@ function openGame(code) {
         toast(`${n.from} nudged you! Your word, please 👀`);
         try { navigator.vibrate?.(200); } catch { /* not supported */ }
       }
+    }
+
+    // Rematch: when someone starts the next game, everyone from this one is pulled in.
+    if (g.status === 'won' && g.next && g.players[state.uid] && !followed.has(g.next)) {
+      followed.add(g.next);
+      followRematch(g);
+      return;
     }
 
     // Anyone who has played a game doesn't need the first-time walkthrough.
@@ -379,7 +443,7 @@ function viewHome() {
   <main class="screen">
     <div class="hero">
       ${logo(170)}
-      <h1 class="wordmark">Samesies</h1>
+      <h1 class="wordmark">Brain<b>smith</b></h1>
       <p class="tagline">Two words in. Meet in the middle.</p>
     </div>
     <div class="grow"></div>
@@ -413,7 +477,7 @@ function viewJoin(g) {
     <header class="bar">${backButton}</header>
     <div class="hero tight">
       ${logo(140)}
-      <h1 class="wordmark small">Samesies</h1>
+      <h1 class="wordmark small">Brain<b>smith</b></h1>
       <p class="tagline">${esc(g.players[g.hostUid]?.name || 'A friend')} invited you to game <strong>${esc(g.code)}</strong></p>
     </div>
     <div class="grow"></div>
@@ -575,7 +639,7 @@ function viewWon(g) {
   <main class="screen win">
     <div class="win-top">
       <div class="pop">${logo(190, '#FFFFFF', '#FF6A4D')}</div>
-      <h1 class="win-title">${g.wonBy === 'vote' ? 'Close enough!' : 'Samesies!'}</h1>
+      <h1 class="win-title">${g.wonBy === 'vote' ? 'Close enough!' : 'Forged!'}</h1>
       <span class="win-sub">${g.wonBy === 'vote' ? 'You all agreed on' : 'Everyone said'}</span>
       <div class="win-word">${esc(g.winWord)}</div>
       <span class="win-sub">${esc(nameList)} · ${g.history.length} round${g.history.length === 1 ? '' : 's'}</span>
@@ -585,17 +649,21 @@ function viewWon(g) {
       <span class="eyebrow light">HOW YOU GOT THERE</span>
       ${g.history.map((h, i) => `<span class="${i === g.history.length - 1 ? 'strong' : ''}">${h.words.map((w) => esc(w.word)).join(' · ')}</span>`).join('')}
     </section>
+    <button class="btn coral" data-act="sharegame">Share how we did it</button>
     ${g.next
       ? `<button class="btn white" data-act="open" data-code="${esc(g.next)}">Join the next game</button>`
       : `<button class="btn white" data-act="again" ${state.busy ? 'disabled' : ''}>Play again, same crew</button>`}
-    <button class="btn ghost-light" data-act="home">Back to start</button>
+    <div class="row">
+      <button class="btn ghost-light grow" data-act="newcrew" ${state.busy ? 'disabled' : ''}>New game, new people</button>
+      <button class="btn ghost-light grow" data-act="home">Back to start</button>
+    </div>
   </main>`;
 }
 
 const TOUR = [
   { title: 'Everyone picks a word', body: 'Any word at all. Nobody sees it until everyone’s locked in.' },
   { title: 'They all flip at once', body: 'Then, next round, everyone looks for one word that connects them all.' },
-  { title: 'Match to win', body: 'Keep connecting until every single player types the same word. Samesies!' },
+  { title: 'Match to win', body: 'Keep connecting until every single player types the same word. Forged!' },
 ];
 
 function viewTour() {
@@ -727,6 +795,8 @@ $app.addEventListener('click', async (e) => {
   if (act === 'nudge') nudge(el.dataset.uid);
   if (act === 'again') playAgain();
   if (act === 'vote') startVote();
+  if (act === 'sharegame') shareGame();
+  if (act === 'newcrew') newCrew();
   if (act === 'mute') { setMuted(!isMuted()); render(); }
   if (act === 'starter') {
     const used = state.game?.used || [];
@@ -748,9 +818,9 @@ $app.addEventListener('click', async (e) => {
   if (act === 'seen') { store.set(`seen.${state.game.code}`, Number(el.dataset.round)); render(); }
   if (act === 'share') {
     const url = shareLink(state.game.code);
-    const text = `Play Samesies with me! Code ${state.game.code}`;
+    const text = `Play Brainsmith with me! Code ${state.game.code}`;
     try {
-      if (navigator.share) await navigator.share({ title: 'Samesies', text, url });
+      if (navigator.share) await navigator.share({ title: 'Brainsmith', text, url });
       else { await navigator.clipboard.writeText(url); toast('Invite link copied'); }
     } catch { /* share sheet dismissed */ }
   }
@@ -774,7 +844,7 @@ onAuthStateChanged(auth, (user) => {
 });
 signInAnonymously(auth).catch((e) => {
   console.error(e);
-  state.authError = 'Could not connect to Samesies. Check your connection and refresh.';
+  state.authError = 'Could not connect to Brainsmith. Check your connection and refresh.';
   render();
 });
 

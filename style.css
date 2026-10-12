@@ -255,3 +255,8 @@ body:has(.win) { background: var(--indigo); }
 .dots .on { width: 22px; background: var(--indigo); }
 .btn.ghost { height: 44px; background: transparent; color: var(--muted); font-size: 16px; font-weight: 500; }
 .inline-link { color: var(--indigo); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+
+/* Brainsmith */
+.wordmark b { color: var(--indigo); font-weight: 800; }
+.btn.coral { background: var(--coral); color: var(--ink); }
+.win .row .btn { padding: 0 8px; }
