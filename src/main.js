@@ -91,6 +91,7 @@ const logo = (size = 170, a = '#4B4DDB', b = '#FF6A4D') =>
   + `<circle cx="76" cy="60" r="30" fill="${a}" opacity="0.9"/>`
   + `<circle cx="124" cy="60" r="30" fill="${b}" opacity="0.85"/>`
   + `<path d="M100 47 L101.9 58.1 L107 60 L101.9 61.9 L100 73 L98.1 61.9 L93 60 L98.1 58.1Z" fill="#FFFFFF"/></svg>`;
+const helpIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.8"/><path d="M12 17.2h.01"/></svg>`;
 const listIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>`;
 const checkIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>`;
 const backIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>`;
@@ -495,7 +496,7 @@ function openGame(code) {
     }
 
     // Anyone who has played a game doesn't need the first-time walkthrough.
-    if (g.players[state.uid] && state.tour !== null) { state.tour = null; store.set('toured', true); }
+    if (g.players[state.uid] && !store.get('toured', false)) { state.tour = null; store.set('toured', true); }
 
     // Someone asked "Close enough?"
     if (g.vote && !g.vote.result && g.vote.by !== state.uid) {
@@ -539,6 +540,7 @@ function header(g, title) {
       <span class="eyebrow">GAME · ${esc(g.code)}</span>
       <h1 class="h-round">${esc(title)}</h1>
     </div>
+    <button class="icon-btn quiet" data-act="tour" aria-label="How to play">${helpIcon}</button>
     <button class="icon-btn quiet" data-act="mute" aria-label="${isMuted() ? 'Turn sound on' : 'Turn sound off'}" aria-pressed="${isMuted()}">${soundIcon(isMuted())}</button>
     ${g.status !== 'lobby' ? `<button class="icon-btn" data-act="used" aria-label="Used words, ${usedCount} so far">${listIcon}</button>` : ''}
   </header>`;
@@ -552,6 +554,7 @@ function viewHome() {
   const games = store.get('games', []);
   return `
   <main class="screen">
+    <div class="home-top"><button class="help-pill" data-act="tour">${helpIcon}How to Play</button></div>
     <div class="hero">
       ${logo(170)}
       <h1 class="wordmark">Brain<b>smith</b></h1>
@@ -579,7 +582,7 @@ function viewHome() {
       const turns = games.filter((x) => state.summaries[x.code]?.tone === 'hot').length;
       return `<button class="btn soft games-btn" data-act="games">Your games (${games.length})${turns ? `<span class="turn-pill">${turns} need you</span>` : ''}</button>`;
     })() : ''}
-    <p class="fine">2 to 5 players · no sign-up · <button class="linkish inline-link" data-act="tour">How to play</button></p>
+    <p class="fine">2 to 5 players · no sign-up · no ads</p>
     <p class="fine maker">a Padre Smitty creation</p>
   </main>`;
 }
@@ -802,28 +805,109 @@ function viewWon(g) {
   </main>`;
 }
 
+// How to Play: swipeable cards. Each card has a little scene drawn in HTML so it follows dark mode.
+const mini = (word, name, cls = '') => `<span class="mini ${cls}"><b>${word}</b><i>${name}</i></span>`;
 const TOUR = [
-  { title: 'Everyone picks a word', body: 'Any word at all. Nobody sees it until everyone’s locked in.' },
-  { title: 'They all flip at once', body: 'Then, next round, everyone looks for one word that connects them all.' },
-  { title: 'Match to win', body: 'Keep connecting until every single player types the same word. Forged!' },
+  {
+    title: 'Every brain, one word',
+    body: 'Brainsmith is a team game. You all win together when every player types the very same word.',
+    art: () => `<div class="tour-art">${logo(150)}</div>`,
+  },
+  {
+    title: 'Pick a word in secret',
+    body: 'Any word you like. Nobody sees it until everyone’s locked in, so take your time. Stuck on round 1? Tap <strong>Give me a word</strong>.',
+    art: () => `<div class="scene">${mini('?', 'Mom', 'back')}${mini('?', 'Jake', 'back d1')}${mini('?', 'You', 'back d2')}</div>`,
+  },
+  {
+    title: 'They all flip at once',
+    body: 'Drumroll, then every word is revealed together. The fun is seeing how far apart you started.',
+    art: () => `<div class="scene flip">${mini('Ocean', 'Mom')}${mini('Pizza', 'Jake', 'd1')}${mini('Robot', 'You', 'd2')}</div>`,
+  },
+  {
+    title: 'Meet in the middle',
+    body: 'Next round, everyone looks for one word that connects the words you just saw. It doesn’t have to be perfect, just your best guess at what the others will say.',
+    art: () => `<div class="scene bridge"><span class="bridge-row"><span class="pill-word">Ocean</span><span class="plus">+</span><span class="pill-word">Pizza</span></span><span class="arrow">↓</span><span class="pill-word hot">Anchovy?</span></div>`,
+  },
+  {
+    title: 'Forge it!',
+    body: 'Keep connecting, round after round, until all of you land on the same word. Then it’s <strong>Forged!</strong>',
+    art: () => `<div class="scene forged">${mini('Anchovy', 'Mom', 'win')}${mini('Anchovy', 'Jake', 'win d1')}${mini('Anchovy', 'You', 'win d2')}</div>`,
+  },
+  {
+    title: 'What counts as a match',
+    body: '',
+    art: () => `<ul class="rules">
+      <li class="ok"><span class="mark">${checkIcon}</span><span><b>Capitals don’t matter.</b> Tennessee = tennessee</span></li>
+      <li class="ok"><span class="mark">${checkIcon}</span><span><b>Plurals count.</b> Game = games</span></li>
+      <li class="ok"><span class="mark">${checkIcon}</span><span><b>Endings count.</b> Run = running, bake = baked</span></li>
+      <li class="ok"><span class="mark">${checkIcon}</span><span><b>Two-word answers are fine.</b> Ice cream, New York</span></li>
+      <li class="no"><span class="mark">✕</span><span><b>Extra words make it different.</b> Cliff ≠ Cliff Swaim. If everyone agrees it’s the same, vote <b>Close enough?</b></span></li>
+      <li class="no"><span class="mark">✕</span><span><b>No repeats.</b> A word already played this game is off limits.</span></li>
+    </ul>`,
+  },
+  {
+    title: 'Handy buttons',
+    body: '',
+    art: () => `<ul class="rules tools">
+      <li><span class="mark">👋</span><span><b>Nudge</b> a player who’s taking a while.</span></li>
+      <li><span class="mark">🤝</span><span><b>Close enough?</b> starts a vote when words almost match. Everyone has to say yes.</span></li>
+      <li><span class="mark">${listIcon}</span><span><b>Used words</b> shows every word played so far.</span></li>
+      <li><span class="mark">😂</span><span><b>React</b> to anyone’s word after the reveal.</span></li>
+    </ul>`,
+  },
 ];
 
 function viewTour() {
   const i = state.tour;
-  const step = TOUR[i];
+  const last = TOUR.length - 1;
   return `
   <div class="sheet-backdrop tour" data-act="tour-skip">
-    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="tour-title" data-stop>
-      <div class="grabber"></div>
-      <div class="tour-art">${logo(110)}</div>
-      <span class="eyebrow">HOW TO PLAY · ${i + 1} OF ${TOUR.length}</span>
-      <h2 id="tour-title" class="h-sheet">${step.title}</h2>
-      <p class="muted tour-body">${step.body}</p>
+    <div class="sheet howto" role="dialog" aria-modal="true" aria-labelledby="tour-title" data-stop>
+      <div class="howto-head">
+        <span id="tour-title" class="h-sheet">How to Play</span>
+        <button class="icon-btn quiet" data-act="tour-skip" aria-label="Close How to Play">✕</button>
+      </div>
+      <div class="howto-track" tabindex="0" aria-roledescription="carousel">
+        ${TOUR.map((c, j) => `
+        <section class="howto-card${j === i ? ' on' : ''}" aria-roledescription="slide" aria-label="${j + 1} of ${TOUR.length}: ${c.title}">
+          ${c.art()}
+          <span class="eyebrow">${j + 1} OF ${TOUR.length}</span>
+          <h2 class="howto-title">${c.title}</h2>
+          ${c.body ? `<p class="muted tour-body">${c.body}</p>` : ''}
+        </section>`).join('')}
+      </div>
       <div class="dots" aria-hidden="true">${TOUR.map((_, j) => `<span class="${j === i ? 'on' : ''}"></span>`).join('')}</div>
-      <button class="btn primary" data-act="tour-next">${i === TOUR.length - 1 ? 'Let’s play' : 'Next'}</button>
-      ${i < TOUR.length - 1 ? '<button class="btn ghost" data-act="tour-skip">Skip</button>' : ''}
+      <div class="row howto-nav">
+        <button class="btn ghost" data-act="tour-skip" ${i === last ? 'hidden' : ''}>Skip</button>
+        <button class="btn primary grow" data-act="tour-next">${i === last ? 'Let’s play' : 'Next'}</button>
+      </div>
     </div>
   </div>`;
+}
+
+// Keep the dots and button in step with swiping, without re-rendering the whole page.
+function wireTour() {
+  const track = $app.querySelector('.howto-track');
+  if (!track) return;
+  track.scrollLeft = state.tour * track.clientWidth;
+  const sync = () => {
+    const i = Math.round(track.scrollLeft / track.clientWidth);
+    if (i === state.tour || i < 0 || i >= TOUR.length) return;
+    state.tour = i;
+    const last = i === TOUR.length - 1;
+    $app.querySelectorAll('.tour .dots span').forEach((d, j) => d.classList.toggle('on', j === i));
+    $app.querySelectorAll('.howto-card').forEach((c, j) => c.classList.toggle('on', j === i));
+    const next = $app.querySelector('[data-act=tour-next]');
+    next.textContent = last ? 'Let’s play' : 'Next';
+    $app.querySelector('.howto-nav .btn.ghost').hidden = last;
+  };
+  track.addEventListener('scroll', () => { clearTimeout(wireTour.t); wireTour.t = setTimeout(sync, 60); }, { passive: true });
+}
+
+function goTour(i) {
+  const track = $app.querySelector('.howto-track');
+  if (!track) { state.tour = i; render(); return; }
+  track.scrollTo({ left: i * track.clientWidth, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
 function viewGamesSheet() {
@@ -901,11 +985,12 @@ function render() {
 
   const g = state.game;
   const sheetWasOpen = !!$app.querySelector('.sheet-backdrop:not(.tour)');
+  const tourWasOpen = !!$app.querySelector('.tour');
   const toastWas = $app.querySelector('.toast')?.textContent;
   $app.innerHTML = currentView()
     + (state.showUsed && g ? viewUsedSheet(g) : '')
     + (state.showGames && !state.code ? viewGamesSheet() : '')
-    + (state.tour !== null && !state.code ? viewTour() : '')
+    + (state.tour !== null ? viewTour() : '')
     + (state.toast ? `<div class="toast" role="status">${esc(state.toast)}</div>` : '');
 
   // Live updates re-render everything; only play entrance animations the first time something appears.
@@ -915,6 +1000,8 @@ function render() {
   else if (main) playScreenFx(main, g);
   render.lastKey = screenKey;
   if (sheetWasOpen) $app.querySelector('.sheet-backdrop')?.classList.add('no-anim');
+  if (tourWasOpen) $app.querySelector('.tour')?.classList.add('no-anim');
+  wireTour();
   if (toastWas && toastWas === state.toast) $app.querySelector('.toast')?.classList.add('no-anim');
 
   $app.querySelectorAll('input').forEach((i) => {
@@ -983,9 +1070,8 @@ $app.addEventListener('click', async (e) => {
   }
   if (act === 'tour') { state.tour = 0; render(); }
   if (act === 'tour-next') {
-    if (state.tour < TOUR.length - 1) state.tour += 1;
-    else { state.tour = null; store.set('toured', true); }
-    render();
+    if (state.tour < TOUR.length - 1) goTour(state.tour + 1);
+    else { state.tour = null; store.set('toured', true); render(); }
   }
   if (act === 'tour-skip' && !(e.target.closest('[data-stop]') && !e.target.closest('button'))) { state.tour = null; store.set('toured', true); render(); }
   if (act === 'yes') castVote(true);
@@ -1008,6 +1094,8 @@ document.addEventListener('pointerdown', unlockAudio, { capture: true });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && state.showUsed) { state.showUsed = false; render(); }
   if (e.key === 'Escape' && state.showGames) { state.showGames = false; render(); }
+  if (state.tour !== null && e.key === 'ArrowRight' && state.tour < TOUR.length - 1) goTour(state.tour + 1);
+  if (state.tour !== null && e.key === 'ArrowLeft' && state.tour > 0) goTour(state.tour - 1);
   if (e.key === 'Escape' && state.tour !== null) { state.tour = null; store.set('toured', true); render(); }
 });
 
