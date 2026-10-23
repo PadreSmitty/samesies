@@ -82,15 +82,8 @@ function fail(err) {
 
 // Two overlapping circles, each rippling outward in fading rings: rounds of guesses meeting in the middle,
 // with a spark where the two minds meet.
-const logo = (size = 170, a = '#4B4DDB', b = '#FF6A4D') =>
-  `<svg width="${size}" height="${Math.round(size * 0.62)}" viewBox="0 -2 200 124" aria-hidden="true">`
-  + `<circle cx="76" cy="60" r="58" fill="none" stroke="${a}" stroke-width="3.5" opacity="0.18"/>`
-  + `<circle cx="124" cy="60" r="58" fill="none" stroke="${b}" stroke-width="3.5" opacity="0.18"/>`
-  + `<circle cx="76" cy="60" r="44" fill="none" stroke="${a}" stroke-width="4.5" opacity="0.42"/>`
-  + `<circle cx="124" cy="60" r="44" fill="none" stroke="${b}" stroke-width="4.5" opacity="0.42"/>`
-  + `<circle cx="76" cy="60" r="30" fill="${a}" opacity="0.9"/>`
-  + `<circle cx="124" cy="60" r="30" fill="${b}" opacity="0.85"/>`
-  + `<path d="M100 47 L101.9 58.1 L107 60 L101.9 61.9 L100 73 L98.1 61.9 L93 60 L98.1 58.1Z" fill="#FFFFFF"/></svg>`;
+const ART = { logo: [409, 640], spark: [358, 360], bolt: [195, 360], hammer: [313, 360], bolts: [383, 360], burst: [343, 360], swing: [342, 360] };
+const art = (name, h, cls = '') => { const [w0, h0] = ART[name]; return `<img class="art ${cls}" src="art/${name}.webp" width="${Math.round(w0 * h / h0)}" height="${h}" alt="" aria-hidden="true" decoding="async">`; };
 const helpIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.8"/><path d="M12 17.2h.01"/></svg>`;
 const listIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>`;
 const checkIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>`;
@@ -547,7 +540,7 @@ function header(g, title) {
 }
 
 function viewLoading(msg = 'Loading…') {
-  return `<main class="screen center"><div class="pulse">${logo(120)}</div><p class="muted">${esc(msg)}</p></main>`;
+  return `<main class="screen center"><div class="pulse">${art('logo', 150)}</div><p class="muted">${esc(msg)}</p></main>`;
 }
 
 function viewHome() {
@@ -556,7 +549,7 @@ function viewHome() {
   <main class="screen">
     <div class="home-top"><button class="help-pill" data-act="tour">${helpIcon}How to Play</button></div>
     <div class="hero">
-      ${logo(170)}
+      ${art('logo', 210, 'hero-logo')}
       <h1 class="wordmark">Brain<b>smith</b></h1>
       <p class="tagline">Two words in. Meet in the middle.</p>
     </div>
@@ -568,7 +561,7 @@ function viewHome() {
     </form>
     <button class="daily-card" data-act="daily" ${state.busy ? 'disabled' : ''}>
       <span class="daily-top"><span class="eyebrow">WEIRD DAILY WORDS</span><span class="muted small">${esc(new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</span></span>
-      <span class="daily-title">Scared? You scared.</span>
+      <span class="daily-title">Scared? You scared.</span>${art('bolts', 64, 'daily-art')}
       <span class="muted small">Start with a redonkulous word</span>
     </button>
     <div class="or"><span></span>or<span></span></div>
@@ -595,7 +588,7 @@ function viewJoin(g) {
   <main class="screen">
     <header class="bar">${backButton}</header>
     <div class="hero tight">
-      ${logo(140)}
+      ${art('logo', 170, 'hero-logo')}
       <h1 class="wordmark small">Brain<b>smith</b></h1>
       <p class="tagline">${esc(g.players[g.hostUid]?.name || 'A friend')} invited you to game <strong>${esc(g.code)}</strong></p>
     </div>
@@ -729,7 +722,7 @@ function viewReveal(g, entry) {
     </section>
     <div class="after-reveal stack">
     ${msg ? `<div class="so-close"><span class="so-close-names">${msg}</span><span class="muted">${sub}</span></div>`
-      : `<div class="row msg">${logo(60)}<span class="muted">${esc(sub)}</span></div>`}
+      : `<div class="row msg">${art('spark', 44)}<span class="muted">${esc(sub)}</span></div>`}
     ${g.vote?.round === entry.round ? voteCard(g)
       : `<button class="btn ${nearlyMatch(entry.words.map((w) => w.word)) ? 'close-hot' : 'soft'}" data-act="vote">${nearlyMatch(entry.words.map((w) => w.word)) ? 'Those look the same. Close enough?' : 'Close enough?'}</button>`}
     </div>
@@ -751,7 +744,7 @@ function viewDealt(g, entry) {
         </div>`).join('')}
     </section>
     <div class="after-reveal stack">
-      <div class="row msg">${logo(60)}<span class="muted">Everyone got a different word. Next round, find one word that connects them all.</span></div>
+      <div class="row msg">${art('spark', 44)}<span class="muted">Everyone got a different word. Next round, find one word that connects them all.</span></div>
     </div>
     <div class="grow"></div>
     <button class="btn primary after-reveal" data-act="seen" data-round="${entry.round}">Let’s connect them</button>
@@ -783,7 +776,7 @@ function viewWon(g) {
   return `
   <main class="screen win">
     <div class="win-top">
-      <div class="pop">${logo(190, '#FFFFFF', '#FF6A4D')}</div>
+      <div class="pop win-art">${art('swing', 150)}</div>
       <h1 class="win-title">${g.wonBy === 'vote' ? 'Close enough!' : 'Forged!'}</h1>
       <span class="win-sub">${g.wonBy === 'vote' ? 'You all agreed on' : 'Everyone said'}</span>
       <div class="win-word">${esc(g.winWord)}</div>
@@ -811,7 +804,7 @@ const TOUR = [
   {
     title: 'Every brain, one word',
     body: 'Brainsmith is a team game. You all win together when every player types the very same word.',
-    art: () => `<div class="tour-art">${logo(150)}</div>`,
+    art: () => `<div class="tour-art">${art('logo', 190)}</div>`,
   },
   {
     title: 'Pick a word in secret',
@@ -831,7 +824,7 @@ const TOUR = [
   {
     title: 'Forge it!',
     body: 'Keep connecting, round after round, until all of you land on the same word. Then it’s <strong>Forged!</strong>',
-    art: () => `<div class="scene forged">${mini('Anchovy', 'Mom', 'win')}${mini('Anchovy', 'Jake', 'win d1')}${mini('Anchovy', 'You', 'win d2')}</div>`,
+    art: () => `<div class="scene forged">${art('swing', 80, 'forge-hammer')}${mini('Anchovy', 'Mom', 'win')}${mini('Anchovy', 'Jake', 'win d1')}${mini('Anchovy', 'You', 'win d2')}</div>`,
   },
   {
     title: 'What counts as a match',
@@ -959,12 +952,12 @@ function currentView() {
   if (!state.uid) return viewLoading();
   if (!state.code) return viewHome();
   if (state.gameMissing) {
-    return `<main class="screen center"><header class="bar top-left">${backButton}</header>${logo(120)}<p class="notice">No game with code ${esc(state.code)}.</p><button class="btn outline" data-act="home">Go to start</button></main>`;
+    return `<main class="screen center"><header class="bar top-left">${backButton}</header>${art('logo', 150)}<p class="notice">No game with code ${esc(state.code)}.</p><button class="btn outline" data-act="home">Go to start</button></main>`;
   }
   const g = state.game;
   if (!g) return viewLoading('Finding your game…');
   if (!g.players[state.uid] && g.removed?.includes(state.uid)) {
-    return `<main class="screen center"><header class="bar top-left">${backButton}</header>${logo(120)}<p class="notice">You were taken out of game ${esc(g.code)} so the others could keep playing.</p><button class="btn outline" data-act="home">Go to start</button></main>`;
+    return `<main class="screen center"><header class="bar top-left">${backButton}</header>${art('hammer', 120)}<p class="notice">You were taken out of game ${esc(g.code)} so the others could keep playing.</p><button class="btn outline" data-act="home">Go to start</button></main>`;
   }
   if (!g.players[state.uid]) return viewJoin(g);
   if (g.status === 'lobby') return viewLobby(g);
