@@ -34,6 +34,7 @@ const state = {
   mySub: null, // { round, word }
   showUsed: false,
   showGames: false,
+  showSettings: false,
   summaries: {}, // code -> short description for the Your games list
   busy: false,
   error: '',
@@ -90,6 +91,8 @@ const checkIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" s
 const backIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>`;
 const backButton = `<button class="icon-btn back" data-act="home" aria-label="Step out to the start screen">${backIcon}</button>`;
 const soundIcon = (off) => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/>${off ? '<path d="M17 9l5 6M22 9l-5 6"/>' : '<path d="M17 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12"/>'}</svg>`;
+const gearIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+const chevron = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>`;
 const closeIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
 
 // ---------- game actions ----------
@@ -547,7 +550,7 @@ function viewHome() {
   const games = store.get('games', []);
   return `
   <main class="screen">
-    <div class="home-top"><button class="help-pill" data-act="tour">${helpIcon}How to Play</button></div>
+    <div class="home-top"><button class="help-pill" data-act="tour">${helpIcon}How to Play</button><button class="icon-btn quiet settings-btn" data-act="settings" aria-label="Settings">${gearIcon}</button></div>
     <div class="hero">
       ${art('logo', 210, 'hero-logo')}
       <h1 class="wordmark">Brain<b>smith</b></h1>
@@ -928,6 +931,50 @@ function viewGamesSheet() {
   </div>`;
 }
 
+function viewSettingsSheet() {
+  const games = store.get('games', []);
+  const row = (act, label, sub = '', extra = '') => `
+        <button class="set-row" data-act="${act}" ${extra}>
+          <span class="set-text"><span class="set-label">${label}</span>${sub ? `<span class="set-sub">${sub}</span>` : ''}</span>${chevron}
+        </button>`;
+  return `
+  <div class="sheet-backdrop" data-act="closesettings">
+    <div class="sheet settings" role="dialog" aria-modal="true" aria-labelledby="settings-title" data-stop>
+      <div class="grabber"></div>
+      <div class="row between">
+        <h2 id="settings-title" class="h-sheet">Settings</h2>
+        <button class="icon-btn soft" data-act="closesettings" aria-label="Close">${closeIcon}</button>
+      </div>
+
+      <form class="set-group" data-form="setname">
+        <label for="set-name" class="label">Your name</label>
+        <div class="row">
+          <input id="set-name" name="setname" class="input grow" autocomplete="nickname" maxlength="40" value="${esc(state.name)}" placeholder="What should we call you?">
+          <button class="btn outline">Save</button>
+        </div>
+        <span class="set-sub">Used for new games you start or join.</span>
+      </form>
+
+      <div class="set-group">
+        <button class="set-row" data-act="mute" role="switch" aria-checked="${!isMuted()}">
+          <span class="set-text"><span class="set-label">Sound</span><span class="set-sub">Drumroll, flips and the Forged! fanfare</span></span>
+          <span class="switch ${isMuted() ? '' : 'on'}" aria-hidden="true"><i></i></span>
+        </button>
+        ${row('settings-games', 'Past games', games.length ? `${games.length} game${games.length === 1 ? '' : 's'} on this phone` : 'None yet')}
+        ${row('settings-tour', 'How to Play', 'Swipe through the rules again')}
+      </div>
+
+      <div class="set-group">
+        <a class="set-row" href="privacy.html"><span class="set-text"><span class="set-label">Privacy Policy</span></span>${chevron}</a>
+        <a class="set-row" href="terms.html"><span class="set-text"><span class="set-label">Terms of Use</span></span>${chevron}</a>
+        <div class="set-row disabled" aria-disabled="true"><span class="set-text"><span class="set-label">Restore Purchase</span><span class="set-sub">Coming with Brainsmith Plus</span></span></div>
+      </div>
+
+      <p class="fine maker">Brainsmith · a Padre Smitty creation</p>
+    </div>
+  </div>`;
+}
+
 function viewUsedSheet(g) {
   return `
   <div class="sheet-backdrop" data-act="closeused">
@@ -983,6 +1030,7 @@ function render() {
   $app.innerHTML = currentView()
     + (state.showUsed && g ? viewUsedSheet(g) : '')
     + (state.showGames && !state.code ? viewGamesSheet() : '')
+    + (state.showSettings && !state.code ? viewSettingsSheet() : '')
     + (state.tour !== null ? viewTour() : '')
     + (state.toast ? `<div class="toast" role="status">${esc(state.toast)}</div>` : '');
 
@@ -1033,6 +1081,13 @@ $app.addEventListener('submit', (e) => {
   if (form === 'join') joinGame(data.get('code'));
   if (form === 'joinlink') joinGame(state.code);
   if (form === 'word') submitWord(data.get('word'));
+  if (form === 'setname') {
+    const n = cleanWord(data.get('setname') || '');
+    if (!n) { toast('Type a name first'); return; }
+    state.name = n; store.set('name', n);
+    const home = document.getElementById('name'); if (home) home.value = n;
+    toast('Name saved'); render();
+  }
 });
 
 $app.addEventListener('click', async (e) => {
@@ -1048,6 +1103,10 @@ $app.addEventListener('click', async (e) => {
   if (act === 'vote') startVote();
   if (act === 'sharegame') shareGame();
   if (act === 'games') { state.showGames = true; render(); loadSummaries(); }
+  if (act === 'settings') { state.showSettings = true; render(); }
+  if (act === 'closesettings' && (el.tagName === 'BUTTON' || !e.target.closest('[data-stop]'))) { state.showSettings = false; render(); }
+  if (act === 'settings-games') { state.showSettings = false; state.showGames = true; render(); loadSummaries(); }
+  if (act === 'settings-tour') { state.showSettings = false; state.tour = 0; render(); }
   if (act === 'closegames' && !(e.target.closest('[data-stop]') && !e.target.closest('button'))) { state.showGames = false; render(); }
   if (act === 'forget') forgetGame(el.dataset.code);
   if (act === 'remove') removePlayer(el.dataset.uid);
@@ -1087,6 +1146,7 @@ document.addEventListener('pointerdown', unlockAudio, { capture: true });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && state.showUsed) { state.showUsed = false; render(); }
   if (e.key === 'Escape' && state.showGames) { state.showGames = false; render(); }
+  if (e.key === 'Escape' && state.showSettings) { state.showSettings = false; render(); }
   if (state.tour !== null && e.key === 'ArrowRight' && state.tour < TOUR.length - 1) goTour(state.tour + 1);
   if (state.tour !== null && e.key === 'ArrowLeft' && state.tour > 0) goTour(state.tour - 1);
   if (e.key === 'Escape' && state.tour !== null) { state.tour = null; store.set('toured', true); render(); }
