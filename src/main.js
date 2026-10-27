@@ -8,6 +8,7 @@ import { MIN_PLAYERS, MAX_PLAYERS, makeCode, normalize, cleanWord, isUsed, allMa
 import { STARTERS } from './starters.js';
 import { DAILY_WORDS } from './dailywords.js';
 import { firebaseConfig } from './firebase-config.js';
+import { T } from './strings.js';
 import { unlockAudio, isMuted, setMuted, drumroll, closeSting, fanfare, confetti } from './fx.js';
 
 const fb = initializeApp(firebaseConfig);
@@ -77,7 +78,7 @@ function toast(msg) {
 function fail(err) {
   console.error(err);
   state.busy = false;
-  state.error = typeof err === 'string' ? err : 'Something went wrong. Check your connection and try again.';
+  state.error = typeof err === 'string' ? err : T.errors.generic;
   render();
 }
 
@@ -89,7 +90,7 @@ const helpIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" st
 const listIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>`;
 const checkIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>`;
 const backIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>`;
-const backButton = `<button class="icon-btn back" data-act="home" aria-label="Step out to the start screen">${backIcon}</button>`;
+const backButton = `<button class="icon-btn back" data-act="home" aria-label="${T.a11y.back}">${backIcon}</button>`;
 const soundIcon = (off) => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/>${off ? '<path d="M17 9l5 6M22 9l-5 6"/>' : '<path d="M17 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12"/>'}</svg>`;
 const gearIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
 const chevron = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>`;
@@ -118,7 +119,7 @@ function dailyWords(key = todayKey()) {
 
 async function createGame(opts = {}) {
   const name = cleanWord(state.name);
-  if (!name) return fail('Type your name first.');
+  if (!name) return fail(T.errors.nameFirst);
   state.busy = true; state.error = ''; render();
   try {
     let code;
@@ -151,17 +152,17 @@ async function createGame(opts = {}) {
 async function joinGame(codeInput, asName) {
   const name = cleanWord(asName || state.name);
   const code = String(codeInput || '').trim().toUpperCase();
-  if (!name) return fail('Type your name first.');
-  if (!/^[A-Z]{4}$/.test(code)) return fail('Game codes are 4 letters.');
+  if (!name) return fail(T.errors.nameFirst);
+  if (!/^[A-Z]{4}$/.test(code)) return fail(T.errors.codeFormat);
   state.busy = true; state.error = ''; render();
   try {
     await runTransaction(db, async (tx) => {
       const snap = await tx.get(gameRef(code));
-      if (!snap.exists()) throw 'No game with that code.';
+      if (!snap.exists()) throw T.errors.noGame;
       const g = snap.data();
       if (g.players[state.uid]) return; // already in
-      if (g.status !== 'lobby') throw 'That game already started.';
-      if (g.order.length >= MAX_PLAYERS) throw `That game is full (${MAX_PLAYERS} players max).`;
+      if (g.status !== 'lobby') throw T.errors.started;
+      if (g.order.length >= MAX_PLAYERS) throw T.errors.full(MAX_PLAYERS);
       tx.update(gameRef(code), {
         [`players.${state.uid}`]: { name, joinedAt: Date.now() },
         order: [...g.order, state.uid],
@@ -193,8 +194,8 @@ async function startGame() {
 async function submitWord(raw) {
   const g = state.game;
   const word = cleanWord(raw);
-  if (!word) return fail('Type a word first.');
-  if (isUsed(word, g.used)) return fail(`"${word}" has already been used. Pick another!`);
+  if (!word) return fail(T.errors.wordFirst);
+  if (isUsed(word, g.used)) return fail(T.errors.used(word));
   const round = g.round;
   state.busy = true; state.error = ''; render();
   try {
@@ -252,12 +253,12 @@ async function resolveRound(g) {
 async function nudge(targetUid) {
   const g = state.game;
   if (nudgeCooldown[targetUid] && Date.now() - nudgeCooldown[targetUid] < 60000) {
-    return toast('Give them a minute!');
+    return toast(T.toasts.waitMinute);
   }
   nudgeCooldown[targetUid] = Date.now();
   try {
     await updateDoc(gameRef(g.code), { [`nudges.${targetUid}`]: { at: Date.now(), from: g.players[state.uid].name } });
-    toast(`Nudged ${g.players[targetUid].name} 👋`);
+    toast(T.toasts.nudged(g.players[targetUid].name));
   } catch (e) { fail(e); }
 }
 
@@ -342,7 +343,7 @@ async function followRematch(old) {
           order: [...cur.order, state.uid],
         });
       });
-      toast(`${next.players[next.hostUid]?.name || 'Someone'} started a rematch. You're in!`);
+      toast(T.toasts.rematch(next.players[next.hostUid]?.name || T.someone));
     }
     openGame(code);
   } catch { render(); }
@@ -357,9 +358,8 @@ function shareText(g) {
     const dots = h.words.map((w) => (last ? '🟣' : counts[normalize(w.word)] > 1 ? '🟠' : '⚪')).join('');
     return `${dots} ${h.words.map((w) => w.word).join(' · ')}`;
   });
-  const rounds = `${g.history.length} round${g.history.length === 1 ? '' : 's'}`;
-  const head = g.wonBy === 'vote' ? `🧠 Brainsmith: close enough on "${g.winWord}" in ${rounds}!` : `🧠 Brainsmith: we forged "${g.winWord}" in ${rounds}!`;
-  return `${head}\n\n${lines.join('\n')}\n\nPlay with us:`;
+  const head = (g.wonBy === 'vote' ? T.share.headVote : T.share.head)(g.winWord, g.history.length);
+  return `${head}\n\n${lines.join('\n')}\n\n${T.share.playWithUs}`;
 }
 
 async function shareGame() {
@@ -367,8 +367,8 @@ async function shareGame() {
   const url = location.origin + location.pathname;
   const text = shareText(g);
   try {
-    if (navigator.share) await navigator.share({ title: 'Brainsmith', text, url });
-    else { await navigator.clipboard.writeText(`${text} ${url}`); toast('Copied! Paste it in your group text.'); }
+    if (navigator.share) await navigator.share({ title: T.appName, text, url });
+    else { await navigator.clipboard.writeText(`${text} ${url}`); toast(T.toasts.copiedShare); }
   } catch { /* share sheet dismissed */ }
 }
 
@@ -382,13 +382,14 @@ async function newCrew() {
 // ---------- your games ----------
 function describeGame(g) {
   const others = g.order.filter((u) => u !== state.uid).map((u) => g.players[u]?.name).filter(Boolean);
-  const with_ = others.length ? `With ${listNames(others)}` : 'Just you so far';
-  if (!g.players[state.uid]) return { with_, status: g.removed?.includes(state.uid) ? 'You were removed' : 'Not in this game', tone: 'muted' };
-  if (g.status === 'lobby') return { with_, status: g.hostUid === state.uid ? 'Ready when you are: start it!' : 'Waiting to start', tone: g.hostUid === state.uid ? 'hot' : 'muted' };
-  if (g.status === 'won') return { with_, status: `${g.wonBy === 'vote' ? 'Close enough' : 'Forged'}: ${g.winWord}`, tone: 'done' };
-  if (!g.submitted?.[state.uid]) return { with_, status: `Your turn · round ${g.round}`, tone: 'hot' };
+  const G = T.games;
+  const with_ = others.length ? G.with(listNames(others)) : G.justYou;
+  if (!g.players[state.uid]) return { with_, status: g.removed?.includes(state.uid) ? G.removed : G.notIn, tone: 'muted' };
+  if (g.status === 'lobby') return { with_, status: g.hostUid === state.uid ? G.startIt : G.waitingStart, tone: g.hostUid === state.uid ? 'hot' : 'muted' };
+  if (g.status === 'won') return { with_, status: (g.wonBy === 'vote' ? G.closeEnough : G.forged)(g.winWord), tone: 'done' };
+  if (!g.submitted?.[state.uid]) return { with_, status: G.yourTurn(g.round), tone: 'hot' };
   const waiting = g.order.filter((u) => !g.submitted?.[u]).map((u) => g.players[u].name);
-  return { with_, status: waiting.length ? `Waiting on ${listNames(waiting)}` : 'Revealing…', tone: 'muted' };
+  return { with_, status: waiting.length ? G.waitingOn(listNames(waiting)) : G.revealing, tone: 'muted' };
 }
 
 async function loadSummaries() {
@@ -396,7 +397,7 @@ async function loadSummaries() {
   await Promise.all(games.map(async ({ code }) => {
     try {
       const snap = await getDoc(gameRef(code));
-      state.summaries[code] = snap.exists() ? describeGame(snap.data()) : { with_: 'Game ended', status: 'No longer around', tone: 'muted', gone: true };
+      state.summaries[code] = snap.exists() ? describeGame(snap.data()) : { with_: T.games.ended, status: T.games.gone, tone: 'muted', gone: true };
     } catch { /* offline: keep what we had */ }
   }));
   render();
@@ -411,8 +412,8 @@ function forgetGame(code) {
 // ---------- remove a stuck player ----------
 async function removePlayer(uid) {
   const g = state.game;
-  const name = g.players[uid]?.name || 'this player';
-  if (!confirm(`Remove ${name} from the game? Everyone else can keep playing.`)) return;
+  const name = g.players[uid]?.name || T.thisPlayer;
+  if (!confirm(T.confirmRemove(name))) return;
   try {
     await runTransaction(db, async (tx) => {
       const cur = (await tx.get(gameRef(g.code))).data();
@@ -428,7 +429,7 @@ async function removePlayer(uid) {
         ...(everyone ? { revealed: cur.round } : {}),
       });
     });
-    toast(`${name} was removed.`);
+    toast(T.toasts.removed(name));
   } catch (e) { fail(e); }
 }
 
@@ -446,7 +447,7 @@ function reactionRow(g, round, uid) {
   const r = g.reactions?.[`${round}_${uid}`] || {};
   const counts = {};
   Object.values(r).forEach((e) => { counts[e] = (counts[e] || 0) + 1; });
-  return `<div class="reacts">${REACTIONS.map((e) => `<button class="react${r[state.uid] === e ? ' mine' : ''}" data-act="react" data-round="${round}" data-uid="${esc(uid)}" data-emoji="${e}" aria-label="React ${e}${counts[e] ? `, ${counts[e]} so far` : ''}">${e}${counts[e] ? `<span>${counts[e]}</span>` : ''}</button>`).join('')}</div>`;
+  return `<div class="reacts">${REACTIONS.map((e) => `<button class="react${r[state.uid] === e ? ' mine' : ''}" data-act="react" data-round="${round}" data-uid="${esc(uid)}" data-emoji="${e}" aria-label="${T.a11y.react(e, counts[e])}">${e}${counts[e] ? `<span>${counts[e]}</span>` : ''}</button>`).join('')}</div>`;
 }
 
 function reactionBadges(g, round, uid) {
@@ -479,7 +480,7 @@ function openGame(code) {
     if (n && n.at > store.get('nudgeSeen', 0)) {
       store.set('nudgeSeen', n.at);
       if (Date.now() - n.at < 10 * 60000) {
-        toast(`${n.from} nudged you! Your word, please 👀`);
+        toast(T.toasts.nudgedYou(n.from));
         try { navigator.vibrate?.(200); } catch { /* not supported */ }
       }
     }
@@ -499,7 +500,7 @@ function openGame(code) {
       const key = `${code}.${g.vote.round}`;
       if (lastVoteSeen !== key) {
         lastVoteSeen = key;
-        toast(`${g.players[g.vote.by]?.name || 'Someone'} asked: close enough?`);
+        toast(T.toasts.askedClose(g.players[g.vote.by]?.name || T.someone));
         try { navigator.vibrate?.(200); } catch { /* not supported */ }
       }
     }
@@ -533,16 +534,16 @@ function header(g, title) {
   <header class="bar">
     ${backButton}
     <div class="bar-title">
-      <span class="eyebrow">GAME · ${esc(g.code)}</span>
+      <span class="eyebrow">${T.header.game(esc(g.code))}</span>
       <h1 class="h-round">${esc(title)}</h1>
     </div>
-    <button class="icon-btn quiet" data-act="tour" aria-label="How to play">${helpIcon}</button>
-    <button class="icon-btn quiet" data-act="mute" aria-label="${isMuted() ? 'Turn sound on' : 'Turn sound off'}" aria-pressed="${isMuted()}">${soundIcon(isMuted())}</button>
-    ${g.status !== 'lobby' ? `<button class="icon-btn" data-act="used" aria-label="Used words, ${usedCount} so far">${listIcon}</button>` : ''}
+    <button class="icon-btn quiet" data-act="tour" aria-label="${T.a11y.howTo}">${helpIcon}</button>
+    <button class="icon-btn quiet" data-act="mute" aria-label="${isMuted() ? T.a11y.soundOn : T.a11y.soundOff}" aria-pressed="${isMuted()}">${soundIcon(isMuted())}</button>
+    ${g.status !== 'lobby' ? `<button class="icon-btn" data-act="used" aria-label="${T.a11y.usedWords(usedCount)}">${listIcon}</button>` : ''}
   </header>`;
 }
 
-function viewLoading(msg = 'Loading…') {
+function viewLoading(msg = T.loading) {
   return `<main class="screen center"><div class="pulse">${art('logo', 150)}</div><p class="muted">${esc(msg)}</p></main>`;
 }
 
@@ -550,36 +551,36 @@ function viewHome() {
   const games = store.get('games', []);
   return `
   <main class="screen">
-    <div class="home-top"><button class="help-pill" data-act="tour">${helpIcon}How to Play</button><button class="icon-btn quiet settings-btn" data-act="settings" aria-label="Settings">${gearIcon}</button></div>
+    <div class="home-top"><button class="help-pill" data-act="tour">${helpIcon}${T.home.howTo}</button><button class="icon-btn quiet settings-btn" data-act="settings" aria-label="${T.a11y.settings}">${gearIcon}</button></div>
     <div class="hero">
       ${art('logo', 210, 'hero-logo')}
       <h1 class="wordmark">Brain<b>smith</b></h1>
-      <p class="tagline">Two words in. Meet in the middle.</p>
+      <p class="tagline">${T.home.tagline}</p>
     </div>
     <div class="grow"></div>
     <form class="stack" data-form="create">
-      <label for="name" class="label">Your name</label>
-      <input id="name" name="name" class="input" autocomplete="nickname" maxlength="40" value="${esc(state.name)}" placeholder="What should we call you?">
-      <button class="btn primary" ${state.busy ? 'disabled' : ''}>Start a new game</button>
+      <label for="name" class="label">${T.home.yourName}</label>
+      <input id="name" name="name" class="input" autocomplete="nickname" maxlength="40" value="${esc(state.name)}" placeholder="${T.home.namePlaceholder}">
+      <button class="btn primary" ${state.busy ? 'disabled' : ''}>${T.home.start}</button>
     </form>
     <button class="daily-card" data-act="daily" ${state.busy ? 'disabled' : ''}>
-      <span class="daily-top"><span class="eyebrow">WEIRD DAILY WORDS</span><span class="muted small">${esc(new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</span></span>
-      <span class="daily-title">Scared? You scared.</span>${art('bolts', 64, 'daily-art')}
-      <span class="muted small">Start with a redonkulous word</span>
+      <span class="daily-top"><span class="eyebrow">${T.home.dailyEyebrow}</span><span class="muted small">${esc(new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</span></span>
+      <span class="daily-title">${T.home.dailyTitle}</span>${art('bolts', 64, 'daily-art')}
+      <span class="muted small">${T.home.dailySub}</span>
     </button>
-    <div class="or"><span></span>or<span></span></div>
+    <div class="or"><span></span>${T.home.or}<span></span></div>
     <form class="row" data-form="join">
-      <label for="code" class="sr-only">Game code</label>
-      <input id="code" name="code" class="input code" maxlength="4" autocapitalize="characters" autocomplete="off" placeholder="Game code">
-      <button class="btn outline" ${state.busy ? 'disabled' : ''}>Join</button>
+      <label for="code" class="sr-only">${T.a11y.gameCode}</label>
+      <input id="code" name="code" class="input code" maxlength="4" autocapitalize="characters" autocomplete="off" placeholder="${T.home.codePlaceholder}">
+      <button class="btn outline" ${state.busy ? 'disabled' : ''}>${T.home.join}</button>
     </form>
     ${state.error ? `<p class="error" role="alert">${esc(state.error)}</p>` : ''}
     ${games.length ? (() => {
       const turns = games.filter((x) => state.summaries[x.code]?.tone === 'hot').length;
-      return `<button class="btn soft games-btn" data-act="games">Your games (${games.length})${turns ? `<span class="turn-pill">${turns} need you</span>` : ''}</button>`;
+      return `<button class="btn soft games-btn" data-act="games">${T.games.button(games.length)}${turns ? `<span class="turn-pill">${T.games.needYou(turns)}</span>` : ''}</button>`;
     })() : ''}
-    <p class="fine">2 to 5 players · no sign-up · no ads</p>
-    <p class="fine maker">a Padre Smitty creation</p>
+    <p class="fine">${T.home.fine}</p>
+    <p class="fine maker">${T.home.maker}</p>
   </main>`;
 }
 
@@ -593,16 +594,16 @@ function viewJoin(g) {
     <div class="hero tight">
       ${art('logo', 170, 'hero-logo')}
       <h1 class="wordmark small">Brain<b>smith</b></h1>
-      <p class="tagline">${esc(g.players[g.hostUid]?.name || 'A friend')} invited you to game <strong>${esc(g.code)}</strong></p>
+      <p class="tagline">${T.join.invited(esc(g.players[g.hostUid]?.name || T.aFriend), esc(g.code))}</p>
     </div>
     <div class="grow"></div>
-    ${started ? `<p class="notice">This game already started. Ask them to start a new one and send you the code.</p>
-      <button class="btn outline" data-act="home">Go to start</button>`
-    : full ? `<p class="notice">This game is full.</p><button class="btn outline" data-act="home">Go to start</button>`
+    ${started ? `<p class="notice">${T.join.started}</p>
+      <button class="btn outline" data-act="home">${T.goToStart}</button>`
+    : full ? `<p class="notice">${T.join.full}</p><button class="btn outline" data-act="home">${T.goToStart}</button>`
     : `<form class="stack" data-form="joinlink">
-        <label for="name" class="label">Your name</label>
-        <input id="name" name="name" class="input" autocomplete="nickname" maxlength="40" value="${esc(state.name)}" placeholder="What should we call you?">
-        <button class="btn primary" ${state.busy ? 'disabled' : ''}>Join the game</button>
+        <label for="name" class="label">${T.home.yourName}</label>
+        <input id="name" name="name" class="input" autocomplete="nickname" maxlength="40" value="${esc(state.name)}" placeholder="${T.home.namePlaceholder}">
+        <button class="btn primary" ${state.busy ? 'disabled' : ''}>${T.join.button}</button>
       </form>`}
     ${state.error ? `<p class="error" role="alert">${esc(state.error)}</p>` : ''}
   </main>`;
@@ -613,26 +614,26 @@ function viewLobby(g) {
   const enough = g.order.length >= MIN_PLAYERS;
   return `
   <main class="screen">
-    ${header(g, 'Getting ready')}
+    ${header(g, T.lobby.title)}
     <section class="card center-text">
-      ${g.daily ? '<span class="badge">Weird Daily Words game</span>' : ''}
-      <span class="muted">Invite with this code</span>
+      ${g.daily ? `<span class="badge">${T.lobby.dailyBadge}</span>` : ''}
+      <span class="muted">${T.lobby.inviteWith}</span>
       <div class="big-code">${esc(g.code)}</div>
-      <button class="btn soft" data-act="share">Share invite link</button>
+      <button class="btn soft" data-act="share">${T.lobby.shareLink}</button>
     </section>
     <section class="stack">
-      <span class="eyebrow">PLAYERS · ${g.order.length} OF ${MAX_PLAYERS}</span>
+      <span class="eyebrow">${T.lobby.players(g.order.length, MAX_PLAYERS)}</span>
       ${g.order.map((u) => `
         <div class="player">
           <div class="dot done" style="background:${colorOf(g, u)}">${checkIcon}</div>
-          <span class="pname">${esc(g.players[u].name)}${u === state.uid ? ' (you)' : ''}</span>
-          ${u === g.hostUid ? '<span class="muted small">Host</span>' : ''}
+          <span class="pname">${esc(g.players[u].name)}${u === state.uid ? T.you : ''}</span>
+          ${u === g.hostUid ? `<span class="muted small">${T.host}</span>` : ''}
         </div>`).join('')}
     </section>
     <div class="grow"></div>
     ${isHost
-      ? `<button class="btn primary" data-act="start" ${enough ? '' : 'disabled'}>${enough ? 'Everyone’s here, start!' : 'Waiting for at least one more'}</button>`
-      : `<p class="fine">Waiting for ${esc(g.players[g.hostUid]?.name || 'the host')} to start…</p>`}
+      ? `<button class="btn primary" data-act="start" ${enough ? '' : 'disabled'}>${enough ? T.lobby.startNow : T.lobby.needMore}</button>`
+      : `<p class="fine">${T.lobby.waitingFor(esc(g.players[g.hostUid]?.name || T.theHost))}</p>`}
   </main>`;
 }
 
@@ -642,37 +643,37 @@ function viewRound(g) {
   const waitingOn = g.order.filter((u) => !g.submitted?.[u]);
   return `
   <main class="screen">
-    ${header(g, `Round ${g.round}`)}
+    ${header(g, T.round.title(g.round))}
     ${prev && g.vote?.round === prev.round && !g.vote.result ? voteCard(g) : ''}
     <section class="card center-text">
       ${prev ? `
-        <span class="muted">Connect these</span>
+        <span class="muted">${T.round.connect}</span>
         <div class="word-chips">${prev.words.map((w) => `<span class="word-chip" style="--pc:${colorOf(g, w.uid)}">${esc(w.word)}${reactionBadges(g, prev.round, w.uid)}</span>`).join('')}</div>
         ${prev.dealt ? `<div class="defs">${prev.words.map((w) => `<span><strong>${esc(w.word)}:</strong> ${esc(w.def)}</span>`).join('')}</div>` : ''}
-        ${g.vote?.round === prev.round || prev.dealt ? '' : `<button class="linkish close-link" data-act="vote">Close enough? Ask to count it</button>`}`
+        ${g.vote?.round === prev.round || prev.dealt ? '' : `<button class="linkish close-link" data-act="vote">${T.round.askClose}</button>`}`
       : `
-        <span class="muted">Round one</span>
-        <p class="prompt">Pick any word in the known universe.</p>
-        <span class="muted small">Nouns are easiest. Adjectives make it harder.</span>`}
+        <span class="muted">${T.round.roundOne}</span>
+        <p class="prompt">${T.round.prompt}</p>
+        <span class="muted small">${T.round.promptTip}</span>`}
     </section>
     ${locked ? `
       <section class="locked">
-        <span class="muted">You locked in</span>
+        <span class="muted">${T.round.lockedIn}</span>
         <div class="locked-word">${esc(state.mySub?.round === g.round ? state.mySub.word : '✓')}</div>
-        <span class="muted small">${waitingOn.length ? `Waiting on ${waitingOn.map((u) => esc(g.players[u].name)).join(', ')}…` : 'Revealing…'}</span>
+        <span class="muted small">${waitingOn.length ? T.round.waitingOn(waitingOn.map((u) => esc(g.players[u].name)).join(', ')) : T.round.revealing}</span>
       </section>`
     : `
       <form class="stack" data-form="word">
-        <label for="word" class="label">Your word</label>
-        <input id="word" name="word" class="input big" maxlength="40" autocomplete="off" autocorrect="on" spellcheck="true" autocapitalize="sentences" placeholder="Type it here">
-        <button class="btn primary" ${state.busy ? 'disabled' : ''}>Lock it in</button>
-        ${prev ? '' : '<button type="button" class="btn soft" data-act="starter">Stuck? Give me a word</button>'}
-        <span class="fine">Nobody sees your word until everyone’s in.</span>
+        <label for="word" class="label">${T.round.yourWord}</label>
+        <input id="word" name="word" class="input big" maxlength="40" autocomplete="off" autocorrect="on" spellcheck="true" autocapitalize="sentences" placeholder="${T.round.wordPlaceholder}">
+        <button class="btn primary" ${state.busy ? 'disabled' : ''}>${T.round.lock}</button>
+        ${prev ? '' : `<button type="button" class="btn soft" data-act="starter">${T.round.starter}</button>`}
+        <span class="fine">${T.round.secret}</span>
       </form>`}
     ${state.error ? `<p class="error" role="alert">${esc(state.error)}</p>` : ''}
     <div class="grow"></div>
     <section class="stack tight">
-      <span class="eyebrow">PLAYERS</span>
+      <span class="eyebrow">${T.round.players}</span>
       ${g.order.map((u) => {
         const done = !!g.submitted?.[u];
         const me = u === state.uid;
@@ -681,10 +682,10 @@ function viewRound(g) {
         return `
         <div class="player">
           ${done ? `<div class="dot done" style="background:${colorOf(g, u)}">${checkIcon}</div>` : `<div class="dot" style="border-color:${colorOf(g, u)}"></div>`}
-          <span class="pname">${esc(g.players[u].name)}${me ? ' (you)' : ''}</span>
-          ${done ? '<span class="muted small">Locked in</span>'
-            : me ? '<span class="muted small">Thinking…</span>'
-            : `<button class="btn nudge" data-act="nudge" data-uid="${esc(u)}">Nudge</button>${canRemove ? `<button class="icon-btn soft remove" data-act="remove" data-uid="${esc(u)}" aria-label="Remove ${esc(g.players[u].name)} from the game">${closeIcon}</button>` : ''}`}
+          <span class="pname">${esc(g.players[u].name)}${me ? T.you : ''}</span>
+          ${done ? `<span class="muted small">${T.round.playerLocked}</span>`
+            : me ? `<span class="muted small">${T.round.thinking}</span>`
+            : `<button class="btn nudge" data-act="nudge" data-uid="${esc(u)}">${T.round.nudge}</button>${canRemove ? `<button class="icon-btn soft remove" data-act="remove" data-uid="${esc(u)}" aria-label="${T.a11y.removePlayer(esc(g.players[u].name))}">${closeIcon}</button>` : ''}`}
         </div>`;
       }).join('')}
     </section>
@@ -698,23 +699,21 @@ function matchGroups(words) {
   return Object.values(groups).filter((x) => x.length > 1).sort((a, b) => b.length - a.length);
 }
 
-function listNames(names) {
-  return names.length <= 2 ? names.join(' and ') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
-}
+const listNames = T.listNames;
 
 function viewReveal(g, entry) {
   const groups = matchGroups(entry.words);
   const matched = new Set(groups.flat().map((w) => w.uid));
   const msg = groups.length
-    ? groups.map((grp) => `${listNames(grp.map((w) => esc(w.name)))} ${grp.length === 2 ? 'both' : 'all'} said <em>${esc(grp[0].word)}</em>!`).join('<br>')
+    ? groups.map((grp) => T.reveal.said(listNames(grp.map((w) => esc(w.name))), grp.length === 2, esc(grp[0].word))).join('<br>')
     : '';
   if (entry.dealt) return viewDealt(g, entry);
   const sub = groups.length
-    ? 'So close! Keep going.'
-    : (entry.words.length === 2 ? 'Not yet! Next round, connect these two.' : 'Not yet! Next round, connect all of these.');
+    ? T.reveal.soClose
+    : (entry.words.length === 2 ? T.reveal.notYetTwo : T.reveal.notYetAll);
   return `
   <main class="screen reveal-screen">
-    ${header(g, `Round ${entry.round} is in!`)}
+    ${header(g, T.reveal.title(entry.round))}
     <section class="stack reveal">
       ${entry.words.map((w) => `
         <div class="reveal-card${matched.has(w.uid) ? ' matched' : ''}" style="--pc:${colorOf(g, w.uid)}">
@@ -727,128 +726,118 @@ function viewReveal(g, entry) {
     ${msg ? `<div class="so-close"><span class="so-close-names">${msg}</span><span class="muted">${sub}</span></div>`
       : `<div class="row msg">${art('spark', 44)}<span class="muted">${esc(sub)}</span></div>`}
     ${g.vote?.round === entry.round ? voteCard(g)
-      : `<button class="btn ${nearlyMatch(entry.words.map((w) => w.word)) ? 'close-hot' : 'soft'}" data-act="vote">${nearlyMatch(entry.words.map((w) => w.word)) ? 'Those look the same. Close enough?' : 'Close enough?'}</button>`}
+      : `<button class="btn ${nearlyMatch(entry.words.map((w) => w.word)) ? 'close-hot' : 'soft'}" data-act="vote">${nearlyMatch(entry.words.map((w) => w.word)) ? T.reveal.closeHot : T.reveal.close}</button>`}
     </div>
     <div class="grow"></div>
-    <button class="btn primary after-reveal" data-act="seen" data-round="${entry.round}">On to round ${entry.round + 1}</button>
+    <button class="btn primary after-reveal" data-act="seen" data-round="${entry.round}">${T.reveal.next(entry.round + 1)}</button>
   </main>`;
 }
 
 function viewDealt(g, entry) {
   return `
   <main class="screen reveal-screen">
-    ${header(g, 'Weird words!')}
+    ${header(g, T.dealt.title)}
     <section class="stack reveal">
       ${entry.words.map((w) => `
         <div class="reveal-card" style="--pc:${colorOf(g, w.uid)}">
-          <span class="rname">${esc(w.name)} got</span>
+          <span class="rname">${T.dealt.got(esc(w.name))}</span>
           <span class="rword">${esc(w.word)}</span>
           <span class="rdef">${esc(w.def)}</span>
         </div>`).join('')}
     </section>
     <div class="after-reveal stack">
-      <div class="row msg">${art('spark', 44)}<span class="muted">Everyone got a different word. Next round, find one word that connects them all.</span></div>
+      <div class="row msg">${art('spark', 44)}<span class="muted">${T.dealt.msg}</span></div>
     </div>
     <div class="grow"></div>
-    <button class="btn primary after-reveal" data-act="seen" data-round="${entry.round}">Let’s connect them</button>
+    <button class="btn primary after-reveal" data-act="seen" data-round="${entry.round}">${T.dealt.next}</button>
   </main>`;
 }
 
 function voteCard(g) {
   const v = g.vote;
-  const asker = esc(g.players[v.by]?.name || 'Someone');
+  const asker = esc(g.players[v.by]?.name || T.someone);
   if (v.result === 'no') {
-    const naysayer = esc(g.players[Object.keys(v.no)[0]]?.name || 'Someone');
-    return `<section class="vote done"><span class="muted">${naysayer} said not quite, so play on.</span></section>`;
+    const naysayer = esc(g.players[Object.keys(v.no)[0]]?.name || T.someone);
+    return `<section class="vote done"><span class="muted">${T.vote.playOn(naysayer)}</span></section>`;
   }
   const iVoted = v.yes[state.uid] || v.no[state.uid];
   const waiting = g.order.filter((u) => !v.yes[u] && !v.no[u]).map((u) => esc(g.players[u].name));
   return `
   <section class="vote" aria-live="polite">
-    <span class="vote-title">Close enough?</span>
-    <span class="muted">${v.by === state.uid ? 'You asked' : `${asker} asked`} to count round ${v.round} as a match. Everyone has to agree.</span>
+    <span class="vote-title">${T.vote.title}</span>
+    <span class="muted">${T.vote.explain(v.by === state.uid ? T.vote.youAsked : T.vote.asked(asker), v.round)}</span>
     ${iVoted
-      ? `<span class="muted small">${waiting.length ? `Waiting on ${waiting.join(', ')}…` : 'Counting…'}</span>`
-      : `<div class="row"><button class="btn primary grow" data-act="yes">Yes, count it</button><button class="btn outline" data-act="no">No</button></div>`}
+      ? `<span class="muted small">${waiting.length ? T.vote.waitingOn(waiting.join(', ')) : T.vote.counting}</span>`
+      : `<div class="row"><button class="btn primary grow" data-act="yes">${T.vote.yes}</button><button class="btn outline" data-act="no">${T.vote.no}</button></div>`}
   </section>`;
 }
 
 function viewWon(g) {
   const names = g.order.map((u) => g.players[u].name);
-  const nameList = names.length === 2 ? names.join(' and ') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+  const nameList = listNames(names);
   return `
   <main class="screen win">
     <div class="win-top">
       <div class="pop win-art">${art('swing', 150)}</div>
-      <h1 class="win-title">${g.wonBy === 'vote' ? 'Close enough!' : 'Forged!'}</h1>
-      <span class="win-sub">${g.wonBy === 'vote' ? 'You all agreed on' : 'Everyone said'}</span>
+      <h1 class="win-title">${g.wonBy === 'vote' ? T.won.closeEnough : T.won.forged}</h1>
+      <span class="win-sub">${g.wonBy === 'vote' ? T.won.agreed : T.won.everyone}</span>
       <div class="win-word">${esc(g.winWord)}</div>
-      <span class="win-sub">${esc(nameList)} · ${g.history.length} round${g.history.length === 1 ? '' : 's'}</span>
+      <span class="win-sub">${esc(nameList)} · ${T.rounds(g.history.length)}</span>
     </div>
     <div class="grow"></div>
     <section class="chain">
-      <span class="eyebrow light">HOW YOU GOT THERE</span>
+      <span class="eyebrow light">${T.won.howYouGot}</span>
       ${g.history.map((h, i) => `<span class="${i === g.history.length - 1 ? 'strong' : ''}">${h.words.map((w) => esc(w.word)).join(' · ')}</span>`).join('')}
     </section>
-    <button class="btn coral" data-act="sharegame">Share how we did it</button>
+    <button class="btn coral" data-act="sharegame">${T.won.share}</button>
     ${g.next
-      ? `<button class="btn white" data-act="open" data-code="${esc(g.next)}">Join the next game</button>`
-      : `<button class="btn white" data-act="again" ${state.busy ? 'disabled' : ''}>Play again, same crew</button>`}
+      ? `<button class="btn white" data-act="open" data-code="${esc(g.next)}">${T.won.joinNext}</button>`
+      : `<button class="btn white" data-act="again" ${state.busy ? 'disabled' : ''}>${T.won.again}</button>`}
     <div class="row">
-      <button class="btn ghost-light grow" data-act="newcrew" ${state.busy ? 'disabled' : ''}>New game, new people</button>
-      <button class="btn ghost-light grow" data-act="home">Back to start</button>
+      <button class="btn ghost-light grow" data-act="newcrew" ${state.busy ? 'disabled' : ''}>${T.won.newCrew}</button>
+      <button class="btn ghost-light grow" data-act="home">${T.won.home}</button>
     </div>
   </main>`;
 }
 
 // How to Play: swipeable cards. Each card has a little scene drawn in HTML so it follows dark mode.
 const mini = (word, name, cls = '') => `<span class="mini ${cls}"><b>${word}</b><i>${name}</i></span>`;
+const TT = T.tour;
+const [N1, N2, N3] = TT.names;
 const TOUR = [
+  { title: TT.goalTitle, body: TT.goalBody, art: () => `<div class="tour-art">${art('logo', 190)}</div>` },
   {
-    title: 'Every brain, one word',
-    body: 'Brainsmith is a team game. You all win together when every player types the very same word.',
-    art: () => `<div class="tour-art">${art('logo', 190)}</div>`,
+    title: TT.secretTitle,
+    body: TT.secretBody,
+    art: () => `<div class="scene">${mini('?', N1, 'back')}${mini('?', N2, 'back d1')}${mini('?', N3, 'back d2')}</div>`,
   },
   {
-    title: 'Pick a word in secret',
-    body: 'Any word you like. Nobody sees it until everyone’s locked in, so take your time. Stuck on round 1? Tap <strong>Give me a word</strong>.',
-    art: () => `<div class="scene">${mini('?', 'Mom', 'back')}${mini('?', 'Jake', 'back d1')}${mini('?', 'You', 'back d2')}</div>`,
+    title: TT.flipTitle,
+    body: TT.flipBody,
+    art: () => `<div class="scene flip">${mini(TT.flipWords[0], N1)}${mini(TT.flipWords[1], N2, 'd1')}${mini(TT.flipWords[2], N3, 'd2')}</div>`,
   },
   {
-    title: 'They all flip at once',
-    body: 'Drumroll, then every word is revealed together. The fun is seeing how far apart you started.',
-    art: () => `<div class="scene flip">${mini('Ocean', 'Mom')}${mini('Pizza', 'Jake', 'd1')}${mini('Robot', 'You', 'd2')}</div>`,
+    title: TT.middleTitle,
+    body: TT.middleBody,
+    art: () => `<div class="scene bridge"><span class="bridge-row"><span class="pill-word">${TT.flipWords[0]}</span><span class="plus">+</span><span class="pill-word">${TT.flipWords[1]}</span></span><span class="arrow">↓</span><span class="pill-word hot">${TT.middleGuess}</span></div>`,
   },
   {
-    title: 'Meet in the middle',
-    body: 'Next round, everyone looks for one word that connects the words you just saw. It doesn’t have to be perfect, just your best guess at what the others will say.',
-    art: () => `<div class="scene bridge"><span class="bridge-row"><span class="pill-word">Ocean</span><span class="plus">+</span><span class="pill-word">Pizza</span></span><span class="arrow">↓</span><span class="pill-word hot">Anchovy?</span></div>`,
+    title: TT.forgeTitle,
+    body: TT.forgeBody,
+    art: () => `<div class="scene forged">${art('swing', 80, 'forge-hammer')}${mini(TT.forgeWord, N1, 'win')}${mini(TT.forgeWord, N2, 'win d1')}${mini(TT.forgeWord, N3, 'win d2')}</div>`,
   },
   {
-    title: 'Forge it!',
-    body: 'Keep connecting, round after round, until all of you land on the same word. Then it’s <strong>Forged!</strong>',
-    art: () => `<div class="scene forged">${art('swing', 80, 'forge-hammer')}${mini('Anchovy', 'Mom', 'win')}${mini('Anchovy', 'Jake', 'win d1')}${mini('Anchovy', 'You', 'win d2')}</div>`,
-  },
-  {
-    title: 'What counts as a match',
+    title: TT.matchTitle,
     body: '',
-    art: () => `<ul class="rules">
-      <li class="ok"><span class="mark">${checkIcon}</span><span><b>Capitals don’t matter.</b> Tennessee = tennessee</span></li>
-      <li class="ok"><span class="mark">${checkIcon}</span><span><b>Plurals count.</b> Game = games</span></li>
-      <li class="ok"><span class="mark">${checkIcon}</span><span><b>Endings count.</b> Run = running, bake = baked</span></li>
-      <li class="ok"><span class="mark">${checkIcon}</span><span><b>Two-word answers are fine.</b> Ice cream, New York</span></li>
-      <li class="no"><span class="mark">✕</span><span><b>Extra words make it different.</b> Cliff ≠ Cliff Swaim. If everyone agrees it’s the same, vote <b>Close enough?</b></span></li>
-      <li class="no"><span class="mark">✕</span><span><b>No repeats.</b> A word already played this game is off limits.</span></li>
+    art: () => `<ul class="rules">${TT.matchRules.map(([kind, head, rest]) => `
+      <li class="${kind}"><span class="mark">${kind === 'ok' ? checkIcon : '✕'}</span><span><b>${head}</b> ${rest}</span></li>`).join('')}
     </ul>`,
   },
   {
-    title: 'Handy buttons',
+    title: TT.toolsTitle,
     body: '',
-    art: () => `<ul class="rules tools">
-      <li><span class="mark">👋</span><span><b>Nudge</b> a player who’s taking a while.</span></li>
-      <li><span class="mark">🤝</span><span><b>Close enough?</b> starts a vote when words almost match. Everyone has to say yes.</span></li>
-      <li><span class="mark">${listIcon}</span><span><b>Used words</b> shows every word played so far.</span></li>
-      <li><span class="mark">😂</span><span><b>React</b> to anyone’s word after the reveal.</span></li>
+    art: () => `<ul class="rules tools">${TT.tools.map(([icon, head, rest]) => `
+      <li><span class="mark">${icon === 'list' ? listIcon : icon}</span><span><b>${head}</b> ${rest}</span></li>`).join('')}
     </ul>`,
   },
 ];
@@ -860,22 +849,22 @@ function viewTour() {
   <div class="sheet-backdrop tour" data-act="tour-skip">
     <div class="sheet howto" role="dialog" aria-modal="true" aria-labelledby="tour-title" data-stop>
       <div class="howto-head">
-        <span id="tour-title" class="h-sheet">How to Play</span>
-        <button class="icon-btn quiet" data-act="tour-skip" aria-label="Close How to Play">✕</button>
+        <span id="tour-title" class="h-sheet">${TT.title}</span>
+        <button class="icon-btn quiet" data-act="tour-skip" aria-label="${T.a11y.closeHowTo}">✕</button>
       </div>
       <div class="howto-track" tabindex="0" aria-roledescription="carousel">
         ${TOUR.map((c, j) => `
-        <section class="howto-card${j === i ? ' on' : ''}" aria-roledescription="slide" aria-label="${j + 1} of ${TOUR.length}: ${c.title}">
+        <section class="howto-card${j === i ? ' on' : ''}" aria-roledescription="slide" aria-label="${T.a11y.slide(j + 1, TOUR.length, c.title)}">
           ${c.art()}
-          <span class="eyebrow">${j + 1} OF ${TOUR.length}</span>
+          <span class="eyebrow">${TT.count(j + 1, TOUR.length)}</span>
           <h2 class="howto-title">${c.title}</h2>
           ${c.body ? `<p class="muted tour-body">${c.body}</p>` : ''}
         </section>`).join('')}
       </div>
       <div class="dots" aria-hidden="true">${TOUR.map((_, j) => `<span class="${j === i ? 'on' : ''}"></span>`).join('')}</div>
       <div class="row howto-nav">
-        <button class="btn ghost" data-act="tour-skip" ${i === last ? 'hidden' : ''}>Skip</button>
-        <button class="btn primary grow" data-act="tour-next">${i === last ? 'Let’s play' : 'Next'}</button>
+        <button class="btn ghost" data-act="tour-skip" ${i === last ? 'hidden' : ''}>${TT.skip}</button>
+        <button class="btn primary grow" data-act="tour-next">${i === last ? TT.done : TT.next}</button>
       </div>
     </div>
   </div>`;
@@ -894,7 +883,7 @@ function wireTour() {
     $app.querySelectorAll('.tour .dots span').forEach((d, j) => d.classList.toggle('on', j === i));
     $app.querySelectorAll('.howto-card').forEach((c, j) => c.classList.toggle('on', j === i));
     const next = $app.querySelector('[data-act=tour-next]');
-    next.textContent = last ? 'Let’s play' : 'Next';
+    next.textContent = last ? TT.done : TT.next;
     $app.querySelector('.howto-nav .btn.ghost').hidden = last;
   };
   track.addEventListener('scroll', () => { clearTimeout(wireTour.t); wireTour.t = setTimeout(sync, 60); }, { passive: true });
@@ -913,26 +902,27 @@ function viewGamesSheet() {
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="games-title" data-stop>
       <div class="grabber"></div>
       <div class="row between">
-        <h2 id="games-title" class="h-sheet">Your games</h2>
-        <button class="icon-btn soft" data-act="closegames" aria-label="Close">${closeIcon}</button>
+        <h2 id="games-title" class="h-sheet">${T.games.title}</h2>
+        <button class="icon-btn soft" data-act="closegames" aria-label="${T.a11y.close}">${closeIcon}</button>
       </div>
       ${games.length ? games.map(({ code }) => {
         const d = state.summaries[code];
         return `
         <div class="game-row">
           <button class="game-open" data-act="${d?.gone ? 'forget' : 'open'}" data-code="${esc(code)}">
-            <span class="game-with">${esc(d ? d.with_ : 'Loading…')}</span>
+            <span class="game-with">${esc(d ? d.with_ : T.games.loading)}</span>
             <span class="game-status ${d?.tone || ''}">${esc(d ? d.status : code)}</span>
           </button>
-          <button class="icon-btn soft" data-act="forget" data-code="${esc(code)}" aria-label="Remove game ${esc(code)} from this list">${closeIcon}</button>
+          <button class="icon-btn soft" data-act="forget" data-code="${esc(code)}" aria-label="${T.a11y.forgetGame(esc(code))}">${closeIcon}</button>
         </div>`;
-      }).join('') : '<p class="muted">No games yet.</p>'}
+      }).join('') : `<p class="muted">${T.games.none}</p>`}
     </div>
   </div>`;
 }
 
 function viewSettingsSheet() {
   const games = store.get('games', []);
+  const S = T.settings;
   const row = (act, label, sub = '', extra = '') => `
         <button class="set-row" data-act="${act}" ${extra}>
           <span class="set-text"><span class="set-label">${label}</span>${sub ? `<span class="set-sub">${sub}</span>` : ''}</span>${chevron}
@@ -942,35 +932,35 @@ function viewSettingsSheet() {
     <div class="sheet settings" role="dialog" aria-modal="true" aria-labelledby="settings-title" data-stop>
       <div class="grabber"></div>
       <div class="row between">
-        <h2 id="settings-title" class="h-sheet">Settings</h2>
-        <button class="icon-btn soft" data-act="closesettings" aria-label="Close">${closeIcon}</button>
+        <h2 id="settings-title" class="h-sheet">${S.title}</h2>
+        <button class="icon-btn soft" data-act="closesettings" aria-label="${T.a11y.close}">${closeIcon}</button>
       </div>
 
       <form class="set-group" data-form="setname">
-        <label for="set-name" class="label">Your name</label>
+        <label for="set-name" class="label">${S.yourName}</label>
         <div class="row">
-          <input id="set-name" name="setname" class="input grow" autocomplete="nickname" maxlength="40" value="${esc(state.name)}" placeholder="What should we call you?">
-          <button class="btn outline">Save</button>
+          <input id="set-name" name="setname" class="input grow" autocomplete="nickname" maxlength="40" value="${esc(state.name)}" placeholder="${T.home.namePlaceholder}">
+          <button class="btn outline">${S.save}</button>
         </div>
-        <span class="set-sub">Used for new games you start or join.</span>
+        <span class="set-sub">${S.nameNote}</span>
       </form>
 
       <div class="set-group">
         <button class="set-row" data-act="mute" role="switch" aria-checked="${!isMuted()}">
-          <span class="set-text"><span class="set-label">Sound</span><span class="set-sub">Drumroll, flips and the Forged! fanfare</span></span>
+          <span class="set-text"><span class="set-label">${S.sound}</span><span class="set-sub">${S.soundSub}</span></span>
           <span class="switch ${isMuted() ? '' : 'on'}" aria-hidden="true"><i></i></span>
         </button>
-        ${row('settings-games', 'Past games', games.length ? `${games.length} game${games.length === 1 ? '' : 's'} on this phone` : 'None yet')}
-        ${row('settings-tour', 'How to Play', 'Swipe through the rules again')}
+        ${row('settings-games', S.pastGames, games.length ? S.pastCount(games.length) : S.noneYet)}
+        ${row('settings-tour', S.howTo, S.howToSub)}
       </div>
 
       <div class="set-group">
-        <a class="set-row" href="privacy.html"><span class="set-text"><span class="set-label">Privacy Policy</span></span>${chevron}</a>
-        <a class="set-row" href="terms.html"><span class="set-text"><span class="set-label">Terms of Use</span></span>${chevron}</a>
-        <div class="set-row disabled" aria-disabled="true"><span class="set-text"><span class="set-label">Restore Purchase</span><span class="set-sub">Coming with Brainsmith Plus</span></span></div>
+        <a class="set-row" href="privacy.html"><span class="set-text"><span class="set-label">${S.privacy}</span></span>${chevron}</a>
+        <a class="set-row" href="terms.html"><span class="set-text"><span class="set-label">${S.terms}</span></span>${chevron}</a>
+        <div class="set-row disabled" aria-disabled="true"><span class="set-text"><span class="set-label">${S.restore}</span><span class="set-sub">${S.restoreSoon}</span></span></div>
       </div>
 
-      <p class="fine maker">Brainsmith · a Padre Smitty creation</p>
+      <p class="fine maker">${S.contact}<br>${S.footer}</p>
     </div>
   </div>`;
 }
@@ -981,15 +971,15 @@ function viewUsedSheet(g) {
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="used-title" data-stop>
       <div class="grabber"></div>
       <div class="row between">
-        <h2 id="used-title" class="h-sheet">Used words</h2>
-        <button class="icon-btn soft" data-act="closeused" aria-label="Close">${closeIcon}</button>
+        <h2 id="used-title" class="h-sheet">${T.used.title}</h2>
+        <button class="icon-btn soft" data-act="closeused" aria-label="${T.a11y.close}">${closeIcon}</button>
       </div>
-      <p class="muted">These are off the table. If you try one, we’ll quietly ask for another.</p>
+      <p class="muted">${T.used.explain}</p>
       ${g.history.length ? g.history.map((h) => `
         <div class="stack tight">
-          <span class="eyebrow">ROUND ${h.round}</span>
+          <span class="eyebrow">${T.used.round(h.round)}</span>
           <div class="chips">${h.words.filter((w, i, all) => all.findIndex((x) => normalize(x.word) === normalize(w.word)) === i).map((w) => `<span class="chip static">${esc(w.word)}</span>`).join('')}</div>
-        </div>`).join('') : '<p class="muted">Nothing yet. Round one is wide open.</p>'}
+        </div>`).join('') : `<p class="muted">${T.used.none}</p>`}
     </div>
   </div>`;
 }
@@ -999,12 +989,12 @@ function currentView() {
   if (!state.uid) return viewLoading();
   if (!state.code) return viewHome();
   if (state.gameMissing) {
-    return `<main class="screen center"><header class="bar top-left">${backButton}</header>${art('logo', 150)}<p class="notice">No game with code ${esc(state.code)}.</p><button class="btn outline" data-act="home">Go to start</button></main>`;
+    return `<main class="screen center"><header class="bar top-left">${backButton}</header>${art('logo', 150)}<p class="notice">${T.missing(esc(state.code))}</p><button class="btn outline" data-act="home">${T.goToStart}</button></main>`;
   }
   const g = state.game;
-  if (!g) return viewLoading('Finding your game…');
+  if (!g) return viewLoading(T.findingGame);
   if (!g.players[state.uid] && g.removed?.includes(state.uid)) {
-    return `<main class="screen center"><header class="bar top-left">${backButton}</header>${art('hammer', 120)}<p class="notice">You were taken out of game ${esc(g.code)} so the others could keep playing.</p><button class="btn outline" data-act="home">Go to start</button></main>`;
+    return `<main class="screen center"><header class="bar top-left">${backButton}</header>${art('hammer', 120)}<p class="notice">${T.removedFrom(esc(g.code))}</p><button class="btn outline" data-act="home">${T.goToStart}</button></main>`;
   }
   if (!g.players[state.uid]) return viewJoin(g);
   if (g.status === 'lobby') return viewLobby(g);
@@ -1083,10 +1073,10 @@ $app.addEventListener('submit', (e) => {
   if (form === 'word') submitWord(data.get('word'));
   if (form === 'setname') {
     const n = cleanWord(data.get('setname') || '');
-    if (!n) { toast('Type a name first'); return; }
+    if (!n) { toast(T.toasts.nameFirst); return; }
     state.name = n; store.set('name', n);
     const home = document.getElementById('name'); if (home) home.value = n;
-    toast('Name saved'); render();
+    toast(T.toasts.nameSaved); render();
   }
 });
 
@@ -1133,10 +1123,10 @@ $app.addEventListener('click', async (e) => {
   if (act === 'seen') { store.set(`seen.${state.game.code}`, Number(el.dataset.round)); render(); }
   if (act === 'share') {
     const url = shareLink(state.game.code);
-    const text = `Play Brainsmith with me! Code ${state.game.code}`;
+    const text = T.share.invite(state.game.code);
     try {
-      if (navigator.share) await navigator.share({ title: 'Brainsmith', text, url });
-      else { await navigator.clipboard.writeText(url); toast('Invite link copied'); }
+      if (navigator.share) await navigator.share({ title: T.appName, text, url });
+      else { await navigator.clipboard.writeText(url); toast(T.toasts.inviteCopied); }
     } catch { /* share sheet dismissed */ }
   }
 });
@@ -1163,7 +1153,7 @@ onAuthStateChanged(auth, (user) => {
 });
 signInAnonymously(auth).catch((e) => {
   console.error(e);
-  state.authError = 'Could not connect to Brainsmith. Check your connection and refresh.';
+  state.authError = T.errors.connect;
   render();
 });
 
