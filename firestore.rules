@@ -6,7 +6,10 @@ service cloud.firestore {
       function signedIn() { return request.auth != null; }
       function isPlayer() { return request.auth.uid in resource.data.players; }
 
-      allow read: if signedIn();
+      // Anyone signed in can open a game by its code.
+      allow get: if signedIn();
+      // Only Smitty's phone can list every game (the stats page).
+      allow list: if request.auth != null && request.auth.uid == "xi6uLt4nSKayDrGDmbSb9T7GzKA2";
 
       // Anyone signed in can start a game, as its host and only player.
       allow create: if signedIn()
