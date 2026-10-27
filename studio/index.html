@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Padre Smitty Games</title>
+<meta name="description" content="Padre Smitty Games makes small, warm games for families and friends. Our first: Brainsmith.">
+<meta property="og:title" content="Padre Smitty Games">
+<meta property="og:description" content="Small, warm games for families and friends. Our first: Brainsmith.">
+<meta property="og:image" content="https://padresmitty.com/brainsmith-card.png">
+<meta name="theme-color" content="#F3F4FE">
+<link rel="icon" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --indigo:#4B4DDB; --coral:#FF6A4D; --peri:#F3F4FE; --ink:#1A1B3D; --muted:#5B5D85; --card:#fff; --line:#E3E5FB; }
+  @media (prefers-color-scheme: dark) {
+    :root { --peri:#12132B; --ink:#F3F4FE; --muted:#A9ABD6; --card:#1D1F44; --line:#2C2F5E; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--peri); color:var(--ink); font:400 17px/1.55 'DM Sans', system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 56px 20px 40px; }
+  .studio { font: 800 clamp(38px, 8vw, 60px)/1 'Bricolage Grotesque', sans-serif; letter-spacing: -0.02em; margin: 0; }
+  .studio b { color: var(--indigo); }
+  @media (prefers-color-scheme: dark) { .studio b { color: #8C8EF5; } }
+  .lede { font-size: 20px; color: var(--muted); margin: 14px 0 44px; max-width: 30em; }
+  .game { background: var(--card); border: 1px solid var(--line); border-radius: 28px; padding: 28px; display: grid; grid-template-columns: 150px 1fr; gap: 24px; align-items: center; box-shadow: 0 18px 40px -24px rgba(75,77,219,.35); }
+  .game img { width: 100%; height: auto; }
+  .eyebrow { font: 700 12px/1 'DM Sans'; letter-spacing: .14em; color: var(--coral); text-transform: uppercase; }
+  .game h2 { font: 800 36px/1.05 'Bricolage Grotesque', sans-serif; margin: 8px 0 6px; }
+  .game h2 b { color: var(--indigo); }
+  @media (prefers-color-scheme: dark) { .game h2 b { color: #8C8EF5; } }
+  .game p { margin: 0 0 18px; color: var(--muted); }
+  .play { display: inline-block; background: var(--coral); color: #fff; font-weight: 700; text-decoration: none; padding: 14px 26px; border-radius: 999px; }
+  .play:hover { filter: brightness(1.05); }
+  .soon { margin-top: 22px; border: 2px dashed var(--line); border-radius: 28px; padding: 22px 28px; display: flex; gap: 16px; align-items: center; color: var(--muted); }
+  .soon img { width: 44px; height: auto; flex: none; }
+  .soon strong { color: var(--ink); }
+  footer { margin-top: 56px; color: var(--muted); font-size: 15px; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+  footer a { color: inherit; }
+  @media (max-width: 560px) {
+    main { padding-top: 40px; }
+    .game { grid-template-columns: 1fr; text-align: center; padding: 24px 20px; }
+    .game img { width: 150px; margin: 0 auto; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1 class="studio">Padre Smitty <b>Games</b></h1>
+  <p class="lede">Small, warm games for families and friends. Made in Kentucky for the kitchen table, the group text and the long car ride.</p>
+
+  <section class="game" aria-labelledby="bs">
+    <img src="brainsmith.webp" alt="Brainsmith logo: a brain on an anvil" width="409" height="640">
+    <div>
+      <span class="eyebrow">Our first game</span>
+      <h2 id="bs">Brain<b>smith</b></h2>
+      <p>Everyone says a word at the same time. Then you all try to meet in the middle, round after round, until your minds land on the same word.</p>
+      <a class="play" href="https://playbrainsmith.com">Play Brainsmith</a>
+    </div>
+  </section>
+
+  <div class="soon"><img src="spark.webp" alt="" width="358" height="360"><span><strong>More games are coming.</strong> We’ll share them here first.</span></div>
+
+  <footer>
+    <span>© 2026 Padre Smitty Games</span>
+    <a href="mailto:hello@padresmitty.com">hello@padresmitty.com</a>
+    <a href="https://playbrainsmith.com/privacy.html">Brainsmith privacy</a>
+    <a href="https://playbrainsmith.com/terms.html">Brainsmith terms</a>
+  </footer>
+</main>
+</body>
+</html>

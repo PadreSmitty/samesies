@@ -1,0 +1,29 @@
+# Puts the game on playbrainsmith.com and the studio page on padresmitty.com
+# every time new code lands on main. Needs the FIREBASE_SERVICE_ACCOUNT secret.
+name: Deploy to Firebase Hosting
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip until the secret is added
+        if: env.SA == ''
+        run: echo "FIREBASE_SERVICE_ACCOUNT secret not set yet, skipping deploy."
+      - uses: actions/setup-node@v4
+        if: env.SA != ''
+        with: { node-version: 20, cache: npm }
+      - name: Build
+        if: env.SA != ''
+        run: npm ci && npm run build && npm test
+      - name: Deploy
+        if: env.SA != ''
+        run: |
+          echo "$SA" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx --yes firebase-tools@13 deploy --only hosting --project thesamesiesgame --non-interactive

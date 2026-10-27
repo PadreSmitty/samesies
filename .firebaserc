@@ -1,0 +1,11 @@
+{
+  "projects": { "default": "thesamesiesgame" },
+  "targets": {
+    "thesamesiesgame": {
+      "hosting": {
+        "game": ["thesamesiesgame"],
+        "studio": ["padresmitty"]
+      }
+    }
+  }
+}

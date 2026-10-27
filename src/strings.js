@@ -258,4 +258,10 @@ export const T = {
       ['😂', 'React', 'to anyone’s word after the reveal.'],
     ],
   },
+
+  // Moving day (old address only)
+  move: {
+    home: 'Brainsmith has a new home: <b>playbrainsmith.com</b>. Finish your games here and we’ll take you there.',
+    won: 'Next game? Play it at <b>playbrainsmith.com</b>, our new home.',
+  },
 };

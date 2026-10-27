@@ -1,3 +1,4 @@
+import { onOldSite, newHomeLive, carryUrl } from './move.js';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import {
@@ -36,6 +37,7 @@ const state = {
   showUsed: false,
   showGames: false,
   showSettings: false,
+  moving: false, // old address, new one is live: finish games here, then go
   summaries: {}, // code -> short description for the Your games list
   busy: false,
   error: '',
@@ -557,6 +559,7 @@ function viewHome() {
       <h1 class="wordmark">Brain<b>smith</b></h1>
       <p class="tagline">${T.home.tagline}</p>
     </div>
+    ${state.moving ? `<p class="notice move-note">${T.move.home}</p>` : ''}
     <div class="grow"></div>
     <form class="stack" data-form="create">
       <label for="name" class="label">${T.home.yourName}</label>
@@ -789,6 +792,7 @@ function viewWon(g) {
       <span class="eyebrow light">${T.won.howYouGot}</span>
       ${g.history.map((h, i) => `<span class="${i === g.history.length - 1 ? 'strong' : ''}">${h.words.map((w) => esc(w.word)).join(' · ')}</span>`).join('')}
     </section>
+    ${state.moving ? `<p class="notice move-note">${T.move.won}</p>` : ''}
     <button class="btn coral" data-act="sharegame">${T.won.share}</button>
     ${g.next
       ? `<button class="btn white" data-act="open" data-code="${esc(g.next)}">${T.won.joinNext}</button>`
@@ -1085,7 +1089,7 @@ $app.addEventListener('click', async (e) => {
   if (!el) return;
   if (el.dataset.act === 'closeused' && e.target.closest('[data-stop]') && !e.target.closest('button')) return;
   const act = el.dataset.act;
-  if (act === 'home') leaveGame();
+  if (act === 'home') { leaveGame(); if (state.moving) checkMove(); }
   if (act === 'open') { state.showGames = false; openGame(el.dataset.code); }
   if (act === 'start') startGame();
   if (act === 'nudge') nudge(el.dataset.uid);
@@ -1142,6 +1146,24 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && state.tour !== null) { state.tour = null; store.set('toured', true); render(); }
 });
 
+// ---------- moving to playbrainsmith.com ----------
+// On the old address: if you are in the middle of a game here, stay and finish it.
+// Otherwise go to the new address, taking your name and settings along.
+async function checkMove() {
+  if (!onOldSite || !state.uid || !(await newHomeLive())) return;
+  state.moving = true;
+  const unfinished = [];
+  for (const { code } of store.get('games', [])) {
+    try {
+      const g = (await getDoc(gameRef(code))).data();
+      if (g?.players?.[state.uid] && g.status !== 'won') unfinished.push(code);
+    } catch { /* skip */ }
+  }
+  const stay = state.code ? unfinished.includes(state.code) : unfinished.length > 0;
+  if (stay) { render(); return; }
+  location.replace(carryUrl(state.code));
+}
+
 // ---------- boot ----------
 render();
 onAuthStateChanged(auth, (user) => {
@@ -1149,6 +1171,7 @@ onAuthStateChanged(auth, (user) => {
     state.uid = user.uid;
     if (state.code && !unsubGame) openGame(state.code);
     else { render(); loadSummaries(); }
+    checkMove();
   }
 });
 signInAnonymously(auth).catch((e) => {
