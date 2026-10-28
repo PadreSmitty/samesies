@@ -10,6 +10,7 @@
 <meta property="og:image" content="https://padresmitty.com/brainsmith-card.png">
 <meta name="theme-color" content="#F3F4FE">
 <link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
@@ -21,10 +22,9 @@
   * { box-sizing: border-box; }
   body { margin:0; background:var(--peri); color:var(--ink); font:400 17px/1.55 'DM Sans', system-ui, sans-serif; }
   main { max-width: 720px; margin: 0 auto; padding: 56px 20px 40px; }
-  .studio { font: 800 clamp(38px, 8vw, 60px)/1 'Bricolage Grotesque', sans-serif; letter-spacing: -0.02em; margin: 0; }
-  .studio b { color: var(--indigo); }
-  @media (prefers-color-scheme: dark) { .studio b { color: #8C8EF5; } }
-  .lede { font-size: 20px; color: var(--muted); margin: 14px 0 44px; max-width: 30em; }
+  .studio { margin: 0 auto; width: clamp(200px, 52vw, 260px); }
+  .studio img { display: block; width: 100%; height: auto; border-radius: 50%; background: #fff; box-shadow: 0 18px 40px -22px rgba(26,27,61,.45); }
+  .lede { font-size: 20px; color: var(--muted); margin: 22px auto 44px; max-width: 30em; text-align: center; }
   .game { background: var(--card); border: 1px solid var(--line); border-radius: 28px; padding: 28px; display: grid; grid-template-columns: 150px 1fr; gap: 24px; align-items: center; box-shadow: 0 18px 40px -24px rgba(75,77,219,.35); }
   .game img { width: 100%; height: auto; }
   .eyebrow { font: 700 12px/1 'DM Sans'; letter-spacing: .14em; color: var(--coral); text-transform: uppercase; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <main>
-  <h1 class="studio">Padre Smitty <b>Games</b></h1>
+  <h1 class="studio"><img src="padre-smitty.webp" alt="Padre Smitty Games" width="560" height="560"></h1>
   <p class="lede">Small, warm games for families and friends. Made in Kentucky for the kitchen table, the group text and the long car ride.</p>
 
   <section class="game" aria-labelledby="bs">
