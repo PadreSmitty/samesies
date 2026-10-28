@@ -44,7 +44,10 @@ async function load() {
   try {
     snap = await getDocs(collection(db, 'games'));
   } catch (e) {
-    $('status').innerHTML = `This screen is locked to the game creator's phone.<br><span class="key">This phone's key: <b>${auth.currentUser?.uid}</b></span><br><span class="key">(${e.code || e.message})</span>`;
+    $('status').innerHTML = `This screen is locked to the game creator's phone.<br><span class="key">This phone's key: <b>${auth.currentUser?.uid}</b></span><br><span class="key">(${e.code || e.message})</span><br><button id="copykey" class="refresh">Copy key</button>`;
+    document.getElementById('copykey').onclick = async () => {
+      try { await navigator.clipboard.writeText(auth.currentUser?.uid || ''); document.getElementById('copykey').textContent = 'Copied!'; } catch { /* select it by hand */ }
+    };
     return;
   }
   const now = Date.now();
