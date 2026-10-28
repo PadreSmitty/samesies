@@ -9,7 +9,7 @@ service cloud.firestore {
       // Anyone signed in can open a game by its code.
       allow get: if signedIn();
       // Only Smitty's phone can list every game (the stats page).
-      allow list: if request.auth != null && request.auth.uid in ["9CFxp6EiXXNask1l6zfeOlnRrXm1", "xi6uLt4nSKayDrGDmbSb9T7GzKA2"];
+      allow list: if request.auth != null && request.auth.uid in ["9CFxp6EiXXNask1l6zfeOInRrXm1", "xi6uLt4nSKayDrGDmbSb9T7GzKA2"];
 
       // Anyone signed in can start a game, as its host and only player.
       allow create: if signedIn()
