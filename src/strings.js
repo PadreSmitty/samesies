@@ -264,4 +264,20 @@ export const T = {
     home: 'Brainsmith has a new home: <b>playbrainsmith.com</b>. Finish your games here and we’ll take you there.',
     won: 'Next game? Play it at <b>playbrainsmith.com</b>, our new home.',
   },
+
+  // Alerts (push notifications)
+  alerts: {
+    askTitle: 'Want a buzz when the words flip? 🔔',
+    askBody: 'We’ll ping you when it’s your turn, when someone nudges you, and when you forge a win. Nothing else.',
+    yes: 'Buzz me',
+    no: 'Nah',
+    label: 'Alerts',
+    sub: 'Your turn, nudges and wins',
+    iosInstall: 'On iPhone, add Brainsmith to your Home Screen first (Share, then Add to Home Screen), then turn this on there.',
+    blocked: 'Blocked in your browser settings. Allow notifications for this site to turn them on.',
+    onToast: 'Alerts on. We’ll be (mostly) polite.',
+    offToast: 'Alerts off. Peace and quiet.',
+    notNow: 'No alerts for now. Turn them on anytime in Settings.',
+    failed: 'Couldn’t turn on alerts. Try again in Settings.',
+  },
 };

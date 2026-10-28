@@ -470,3 +470,9 @@ body:has(.win) { background: #4B4DDB; }
 .switch.on { background: var(--indigo); }
 .switch.on i { transform: translateX(20px); }
 .settings .maker { margin-top: 0; text-align: center; }
+
+/* ---------- alerts ---------- */
+.alert-ask { display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 20px; background: var(--card); border: 2px solid var(--indigo); text-align: left; }
+.alert-ask-title { font-family: var(--display); font-weight: 800; font-size: 18px; }
+.alert-ask .row { gap: 8px; margin-top: 4px; }
+.set-row.static { cursor: default; }

@@ -21,9 +21,19 @@ jobs:
       - name: Build
         if: env.SA != ''
         run: npm ci && npm run build && npm test
-      - name: Deploy
+      - name: Key file
         if: env.SA != ''
+        run: echo "$SA" > "$RUNNER_TEMP/sa.json"
+      - name: Deploy website
+        if: env.SA != ''
+        env: { GOOGLE_APPLICATION_CREDENTIALS: "${{ runner.temp }}/sa.json" }
+        run: npx --yes firebase-tools@13 deploy --only hosting --project thesamesiesgame --non-interactive
+      # Alerts and database rules need extra permissions on the key; the website still
+      # publishes if these fail.
+      - name: Deploy alerts and rules
+        if: env.SA != ''
+        continue-on-error: true
+        env: { GOOGLE_APPLICATION_CREDENTIALS: "${{ runner.temp }}/sa.json" }
         run: |
-          echo "$SA" > "$RUNNER_TEMP/sa.json"
-          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
-          npx --yes firebase-tools@13 deploy --only hosting --project thesamesiesgame --non-interactive
+          (cd functions && npm install --no-audit --no-fund)
+          npx --yes firebase-tools@13 deploy --only functions,firestore:rules --project thesamesiesgame --non-interactive --force

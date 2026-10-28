@@ -9,6 +9,7 @@ import { MIN_PLAYERS, MAX_PLAYERS, makeCode, normalize, cleanWord, isUsed, allMa
 import { STARTERS } from './starters.js';
 import { DAILY_WORDS } from './dailywords.js';
 import { firebaseConfig } from './firebase-config.js';
+import { alertSupport, alertPermission, alertsOn, turnOnAlerts, turnOffAlerts, refreshAlerts } from './alerts.js';
 import { T } from './strings.js';
 import { unlockAudio, isMuted, setMuted, drumroll, closeSting, fanfare, confetti } from './fx.js';
 
@@ -323,7 +324,7 @@ async function playAgain() {
       order: [state.uid], round: 1, revealed: 0, submitted: {}, history: [], used: [], winWord: null, nudges: {},
     });
     followed.add(code);
-    await updateDoc(gameRef(old.code), { next: code });
+    await updateDoc(gameRef(old.code), { next: code, nextBy: state.uid });
     state.busy = false;
     openGame(code);
   } catch (e) { fail(e); }
@@ -664,7 +665,8 @@ function viewRound(g) {
         <span class="muted">${T.round.lockedIn}</span>
         <div class="locked-word">${esc(state.mySub?.round === g.round ? state.mySub.word : '✓')}</div>
         <span class="muted small">${waitingOn.length ? T.round.waitingOn(waitingOn.map((u) => esc(g.players[u].name)).join(', ')) : T.round.revealing}</span>
-      </section>`
+      </section>
+      ${waitingOn.length ? viewAlertAsk() : ''}`
     : `
       <form class="stack" data-form="word">
         <label for="word" class="label">${T.round.yourWord}</label>
@@ -924,6 +926,46 @@ function viewGamesSheet() {
   </div>`;
 }
 
+// ---------- alerts ----------
+// Asked once, right after you lock in a word (the moment you'd want a ping later).
+function viewAlertAsk() {
+  const A = T.alerts;
+  if (alertSupport() !== 'yes' || alertPermission() !== 'default' || store.get('alertsAsked', false)) return '';
+  return `
+      <section class="alert-ask">
+        <span class="alert-ask-title">${A.askTitle}</span>
+        <span class="muted small">${A.askBody}</span>
+        <div class="row"><button class="btn primary grow" data-act="alerts-on">${A.yes}</button><button class="btn ghost" data-act="alerts-later">${A.no}</button></div>
+      </section>`;
+}
+
+function viewAlertRow() {
+  const A = T.alerts;
+  const sup = alertSupport();
+  if (sup === 'no') return '';
+  if (sup === 'ios-install') {
+    return `<div class="set-row static"><span class="set-text"><span class="set-label">${A.label}</span><span class="set-sub">${A.iosInstall}</span></span></div>`;
+  }
+  if (alertPermission() === 'denied') {
+    return `<div class="set-row static"><span class="set-text"><span class="set-label">${A.label}</span><span class="set-sub">${A.blocked}</span></span></div>`;
+  }
+  const on = alertsOn();
+  return `
+        <button class="set-row" data-act="${on ? 'alerts-off' : 'alerts-on'}" role="switch" aria-checked="${on}">
+          <span class="set-text"><span class="set-label">${A.label}</span><span class="set-sub">${A.sub}</span></span>
+          <span class="switch ${on ? 'on' : ''}" aria-hidden="true"><i></i></span>
+        </button>`;
+}
+
+async function alertsOnTap() {
+  store.set('alertsAsked', true);
+  try {
+    const ok = await turnOnAlerts(fb, db, state.uid);
+    toast(ok ? T.alerts.onToast : T.alerts.notNow);
+  } catch (e) { console.error(e); toast(T.alerts.failed); }
+  render();
+}
+
 function viewSettingsSheet() {
   const games = store.get('games', []);
   const S = T.settings;
@@ -954,6 +996,7 @@ function viewSettingsSheet() {
           <span class="set-text"><span class="set-label">${S.sound}</span><span class="set-sub">${S.soundSub}</span></span>
           <span class="switch ${isMuted() ? '' : 'on'}" aria-hidden="true"><i></i></span>
         </button>
+        ${viewAlertRow()}
         ${row('settings-games', S.pastGames, games.length ? S.pastCount(games.length) : S.noneYet)}
         ${row('settings-tour', S.howTo, S.howToSub)}
       </div>
@@ -1108,6 +1151,9 @@ $app.addEventListener('click', async (e) => {
   if (act === 'daily') createGame({ daily: true });
   if (act === 'newcrew') newCrew();
   if (act === 'mute') { setMuted(!isMuted()); render(); }
+  if (act === 'alerts-on') alertsOnTap();
+  if (act === 'alerts-later') { store.set('alertsAsked', true); render(); }
+  if (act === 'alerts-off') { turnOffAlerts(fb, db, state.uid).then(() => { toast(T.alerts.offToast); render(); }); }
   if (act === 'starter') {
     const used = state.game?.used || [];
     const pool = STARTERS.filter((w) => !isUsed(w, used));
@@ -1172,6 +1218,7 @@ onAuthStateChanged(auth, (user) => {
     if (state.code && !unsubGame) openGame(state.code);
     else { render(); loadSummaries(); }
     checkMove();
+    refreshAlerts(fb, db, user.uid);
   }
 });
 signInAnonymously(auth).catch((e) => {

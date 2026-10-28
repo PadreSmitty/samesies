@@ -7,3 +7,7 @@ export const firebaseConfig = {
   messagingSenderId: '120235814862',
   appId: '1:120235814862:web:4f5762bc1a08d2f228059f',
 };
+
+// Web Push key from Firebase console > Project settings > Cloud Messaging > Web Push certificates.
+// Alerts stay hidden until this is filled in.
+export const VAPID_KEY = '';
