@@ -1,9 +1,10 @@
-// Moving day: the game is moving from padresmitty.github.io/samesies to playbrainsmith.com.
+// Moving day: the game is moving from its old addresses to playbrainsmith.com.
 // Each web address keeps its own saved name and settings, so the old address hands them over.
 // Import this first: it applies handed-over settings before anything else reads them.
 
 export const NEW_HOME = 'https://playbrainsmith.com/';
-export const onOldSite = location.hostname.endsWith('github.io');
+// Old addresses: GitHub Pages, plus Firebase's own built-in addresses (they show the old name).
+export const onOldSite = /(github\.io|\.web\.app|\.firebaseapp\.com)$/.test(location.hostname);
 
 const KEYS = ['name', 'toured', 'muted'];
 const key = (k) => 'samesies.' + k;
