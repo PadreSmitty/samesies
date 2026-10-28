@@ -10,4 +10,4 @@ export const firebaseConfig = {
 
 // Web Push key from Firebase console > Project settings > Cloud Messaging > Web Push certificates.
 // Alerts stay hidden until this is filled in.
-export const VAPID_KEY = '';
+export const VAPID_KEY = 'BBUQ64_JVKYcW-xtRMi77IaPskvgJtRW7ueEECgPOerrutMYWC2bY2rXyy1LVgggYOsMH5uNpIFEyfSQj1psYl4';
