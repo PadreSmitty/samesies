@@ -29,3 +29,10 @@ npm install
 npm test        # word-matching rules
 npm run build   # rebuild dist/app.js after changing src/
 ```
+
+## Hosting
+
+Every push to `main` builds, tests and publishes with Firebase Hosting (`.github/workflows/deploy.yml`, secret `FIREBASE_SERVICE_ACCOUNT`):
+
+- The game goes to the `thesamesiesgame` site (playbrainsmith.com).
+- The studio page in `studio/` goes to the `padresmitty` site (padresmitty.com).
