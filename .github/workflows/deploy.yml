@@ -36,4 +36,4 @@ jobs:
         env: { GOOGLE_APPLICATION_CREDENTIALS: "${{ runner.temp }}/sa.json" }
         run: |
           (cd functions && npm install --no-audit --no-fund)
-          npx --yes firebase-tools@13 deploy --only functions,firestore:rules --project thesamesiesgame --non-interactive --force
+          npx --yes firebase-tools@14 deploy --only functions,firestore:rules --project thesamesiesgame --non-interactive --force
