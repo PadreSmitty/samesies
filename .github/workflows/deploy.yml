@@ -17,7 +17,7 @@ jobs:
         run: echo "FIREBASE_SERVICE_ACCOUNT secret not set yet, skipping deploy."
       - uses: actions/setup-node@v4
         if: env.SA != ''
-        with: { node-version: 20, cache: npm }
+        with: { node-version: 22, cache: npm }
       - name: Build
         if: env.SA != ''
         run: npm ci && npm run build && npm test
@@ -30,10 +30,15 @@ jobs:
         run: npx --yes firebase-tools@13 deploy --only hosting --project thesamesiesgame --non-interactive
       # Alerts and database rules need extra permissions on the key; the website still
       # publishes if these fail.
-      - name: Deploy alerts and rules
+      - name: Deploy alerts
         if: env.SA != ''
         continue-on-error: true
         env: { GOOGLE_APPLICATION_CREDENTIALS: "${{ runner.temp }}/sa.json" }
         run: |
           (cd functions && npm install --no-audit --no-fund)
-          npx --yes firebase-tools@14 deploy --only functions,firestore:rules --project thesamesiesgame --non-interactive --force
+          npx --yes firebase-tools@14 deploy --only functions --project thesamesiesgame --non-interactive --force
+      - name: Deploy database rules
+        if: env.SA != ''
+        continue-on-error: true
+        env: { GOOGLE_APPLICATION_CREDENTIALS: "${{ runner.temp }}/sa.json" }
+        run: npx --yes firebase-tools@14 deploy --only firestore:rules --project thesamesiesgame --non-interactive --force
