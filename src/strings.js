@@ -274,6 +274,7 @@ export const T = {
     title: 'Save your games',
     body: 'Sign in and your games, name and alerts follow you to any phone or tablet, including the Home Screen app.',
     google: 'Continue with Google',
+    homeScreenNote: 'In the Home Screen app, sign in with email. Signed up with Google in Safari? Tap <b>Sign in</b>, type that Gmail, then <b>Forgot password?</b> to make a password for it.', // html
     or: 'or use email',
     email: 'Email',
     password: 'Password',

@@ -1189,6 +1189,9 @@ function viewSettingsSheet() {
   </div>`;
 }
 
+// iPhone Home Screen apps can't finish Google sign-in (Apple opens Google in a separate window), so they use email.
+const homeScreenApp = () => navigator.standalone === true;
+
 function viewAccountSheet() {
   const A = T.account;
   const creating = state.accountMode === 'create';
@@ -1201,8 +1204,10 @@ function viewAccountSheet() {
         <button class="icon-btn soft" data-act="closeaccount" aria-label="${T.a11y.close}">${closeIcon}</button>
       </div>
       <p class="muted">${A.body}</p>
-      <button class="btn google" data-act="google" ${state.busy ? 'disabled' : ''}>${googleIcon}${A.google}</button>
-      <div class="or"><span></span>${A.or}<span></span></div>
+      ${homeScreenApp()
+        ? `<p class="notice small-note">${A.homeScreenNote}</p>`
+        : `<button class="btn google" data-act="google" ${state.busy ? 'disabled' : ''}>${googleIcon}${A.google}</button>
+      <div class="or"><span></span>${A.or}<span></span></div>`}
       <form class="stack tight" data-form="email">
         <label for="acct-email" class="sr-only">${A.email}</label>
         <input id="acct-email" name="email" type="email" class="input" autocomplete="email" autocapitalize="off" placeholder="${A.email}" required>
