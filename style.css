@@ -476,3 +476,19 @@ body:has(.win) { background: #4B4DDB; }
 .alert-ask-title { font-family: var(--display); font-weight: 800; font-size: 18px; }
 .alert-ask .row { gap: 8px; margin-top: 4px; }
 .set-row.static { cursor: default; }
+
+/* ---------- sign-in, report, block ---------- */
+.sheet.account { gap: 14px; max-height: 92vh; }
+.btn.google { background: #fff; color: #1A1B3D; border: 2px solid var(--line); gap: 10px; display: flex; align-items: center; justify-content: center; }
+.acct-links { flex-wrap: wrap; gap: 8px; }
+.acct-link { color: var(--indigo); font-size: 15px; min-height: 44px; }
+.acct-link b { text-decoration: underline; text-underline-offset: 3px; }
+.small-note { font-size: 15px; margin: 0; }
+.set-row.hot-row { background: var(--indigo-soft); }
+.set-row.hot-row .set-label { color: var(--indigo); }
+.set-row.danger-row .set-label { color: var(--danger); }
+.save-games { align-self: center; text-align: center; color: var(--muted); min-height: 44px; }
+.save-games b { color: var(--indigo); text-decoration: underline; text-underline-offset: 3px; }
+.player .more { width: 36px; height: 36px; margin-left: -6px; color: var(--faint); background: transparent; }
+.choice { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 14px; border-radius: 14px; background: var(--ground); font-weight: 500; cursor: pointer; }
+.choice input { width: 20px; height: 20px; accent-color: var(--indigo); flex-shrink: 0; }

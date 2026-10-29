@@ -4,7 +4,7 @@
   "description": "Brainsmith: a word game for 2 to 5 players",
   "scripts": {
     "build": "esbuild src/main.js src/stats.js --bundle --minify --format=esm --target=es2020 --outdir=dist --entry-names=[name] && mv dist/main.js dist/app.js",
-    "test": "node test/logic.test.mjs && node test/alerts.test.mjs"
+    "test": "node test/logic.test.mjs && node test/alerts.test.mjs && node test/account.test.mjs"
   },
   "repository": {
     "type": "git",

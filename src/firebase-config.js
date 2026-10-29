@@ -1,7 +1,7 @@
 // Public web config for the Firebase project (safe to ship; access is controlled by firestore.rules).
 export const firebaseConfig = {
   apiKey: 'AIzaSyAEbf9VBdvXdHUSlH0rZgHL7SmvXyAn_nM',
-  authDomain: 'thesamesiesgame.firebaseapp.com',
+  authDomain: 'playbrainsmith.com',
   projectId: 'thesamesiesgame',
   storageBucket: 'thesamesiesgame.firebasestorage.app',
   messagingSenderId: '120235814862',

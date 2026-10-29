@@ -38,6 +38,12 @@
     table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
     td, th { text-align: left; padding: 4px 0; border-bottom: 1px solid var(--line); }
     td:last-child, th:last-child { text-align: right; }
+    #reports { background: var(--card); border-radius: 18px; padding: 16px; border: 2px solid #FF6A4D; display: flex; flex-direction: column; gap: 12px; }
+    .report { display: flex; flex-direction: column; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--line); font-size: 14px; }
+    .report:last-child { border-bottom: none; padding-bottom: 0; }
+    .report b { font-size: 16px; }
+    .report .meta { color: var(--muted); font-size: 13px; }
+    .report button { align-self: flex-start; height: 34px; background: var(--ground); margin-top: 4px; }
     .fine { color: var(--muted); font-size: 13px; text-align: center; word-break: break-all; }
   </style>
 </head>
@@ -45,6 +51,7 @@
   <main>
     <div class="row"><h1>Brain<b>smith</b> stats</h1><button id="refresh">Refresh</button></div>
     <p id="status">Loading…</p>
+    <section id="reports" hidden></section>
     <section id="tiles"></section>
     <section class="panel">
       <h2>GAMES STARTED PER DAY · LAST 14 DAYS</h2>

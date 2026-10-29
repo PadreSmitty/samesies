@@ -1,6 +1,34 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+    // Smitty's phones (the private stats page).
+    function isStats() { return request.auth != null && request.auth.uid in ["9CFxp6EiXXNask1l6zfeOInRrXm1", "xi6uLt4nSKayDrGDmbSb9T7GzKA2"]; }
+
+    // Your name and who you've blocked. Only you can see it.
+    match /users/{uid} {
+      allow read, write: if owner(uid);
+    }
+
+    // Just signed in on a phone that was playing as a guest: ask the server to move the guest's games over.
+    match /merges/{uid} {
+      allow read: if owner(uid);
+      allow create, update: if owner(uid)
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && request.resource.data.keys().hasOnly(['anonToken', 'at']);
+    }
+
+    // "Delete my account". The server does the rest.
+    match /deletions/{uid} {
+      allow create: if owner(uid);
+    }
+
+    // Reports of a player or a word. Anyone can file one; only Smitty can read them.
+    match /reports/{id} {
+      allow create: if signedIn() && request.resource.data.by == request.auth.uid;
+      allow read, update: if isStats();
+    }
 
     // Each device's alert address, readable and writable only by its owner.
     match /pushTokens/{uid} {
@@ -8,13 +36,12 @@ service cloud.firestore {
     }
 
     match /games/{code} {
-      function signedIn() { return request.auth != null; }
       function isPlayer() { return request.auth.uid in resource.data.players; }
 
       // Anyone signed in can open a game by its code.
       allow get: if signedIn();
-      // Only Smitty's phone can list every game (the stats page).
-      allow list: if request.auth != null && request.auth.uid in ["9CFxp6EiXXNask1l6zfeOInRrXm1", "xi6uLt4nSKayDrGDmbSb9T7GzKA2"];
+      // You can list the games you're in (Your games). Only Smitty's phone can list every game (the stats page).
+      allow list: if isStats() || (signedIn() && request.auth.uid in resource.data.order);
 
       // Anyone signed in can start a game, as its host and only player.
       allow create: if signedIn()

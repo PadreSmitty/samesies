@@ -1,10 +1,12 @@
 import { onOldSite, newHomeLive, carryUrl } from './move.js';
 import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInAnonymously, connectAuthEmulator } from 'firebase/auth';
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, runTransaction,
-  collection, getDocs, serverTimestamp, deleteField,
+  collection, getDocs, serverTimestamp, deleteField, addDoc, query, where, limit, connectFirestoreEmulator,
 } from 'firebase/firestore';
+import { googleSignIn, finishRedirect, emailCreate, emailSignIn, resetPassword, signOutNow, requestDelete, watchMerge, accountOf } from './account.js';
+import { isRude } from './rude.js';
 import { MIN_PLAYERS, MAX_PLAYERS, makeCode, normalize, cleanWord, isUsed, allMatch, nearlyMatch, commonWord } from './logic.js';
 import { STARTERS } from './starters.js';
 import { DAILY_WORDS } from './dailywords.js';
@@ -16,6 +18,14 @@ import { unlockAudio, isMuted, setMuted, drumroll, closeSting, fanfare, confetti
 const fb = initializeApp(firebaseConfig);
 const auth = getAuth(fb);
 const db = getFirestore(fb);
+// Local testing only: talk to the Firebase emulators instead of the real database.
+const emu = /^(127\.0\.0\.1|localhost)$/.test(location.hostname)
+  && (new URLSearchParams(location.search).has('emu') || sessionStorage.getItem('emu') === '1');
+if (emu) {
+  sessionStorage.setItem('emu', '1');
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+}
 
 const $app = document.getElementById('app');
 
@@ -38,6 +48,14 @@ const state = {
   showUsed: false,
   showGames: false,
   showSettings: false,
+  account: null, // { email, google } when signed in, null for a guest
+  showAccount: false,
+  accountMode: 'create', // or 'signin'
+  accountError: '',
+  accountNote: '',
+  blocked: new Set(store.get('blocked', [])),
+  reportFor: null, // uid of the player whose menu is open
+  reportStep: 'menu', // 'menu' | 'report'
   moving: false, // old address, new one is live: finish games here, then go
   summaries: {}, // code -> short description for the Your games list
   busy: false,
@@ -57,6 +75,10 @@ const colorOf = (g, uid) => PLAYER_COLORS[Math.max(0, g.order.indexOf(uid)) % PL
 const REACTIONS = ['😂', '🤯', '🔥', '❤️'];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const gameRef = (code) => doc(db, 'games', code);
+// Blocked players show up as "Blocked player" with their words hidden, on this screen only.
+const nameOf = (g, uid) => (state.blocked.has(uid) && uid !== state.uid ? T.report.hiddenName : g.players[uid]?.name);
+const wordOf = (w) => (state.blocked.has(w.uid) && w.uid !== state.uid ? T.report.hiddenWord : w.word);
+const whoOf = (w) => (state.blocked.has(w.uid) && w.uid !== state.uid ? T.report.hiddenName : w.name);
 const subRef = (code, round, uid) => doc(db, 'games', code, 'rounds', String(round), 'subs', uid);
 const shareLink = (code) => `${location.origin}${location.pathname}?g=${code}`;
 
@@ -97,6 +119,9 @@ const backButton = `<button class="icon-btn back" data-act="home" aria-label="${
 const soundIcon = (off) => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/>${off ? '<path d="M17 9l5 6M22 9l-5 6"/>' : '<path d="M17 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12"/>'}</svg>`;
 const gearIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
 const chevron = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>`;
+const moreIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`;
+const googleIcon = `<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
+const moreButton = (g, u) => (u === state.uid ? '' : `<button class="icon-btn soft more" data-act="player-menu" data-uid="${esc(u)}" aria-label="${T.report.more(esc(nameOf(g, u)))}">${moreIcon}</button>`);
 const closeIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
 
 // ---------- game actions ----------
@@ -123,6 +148,8 @@ function dailyWords(key = todayKey()) {
 async function createGame(opts = {}) {
   const name = cleanWord(state.name);
   if (!name) return fail(T.errors.nameFirst);
+  if (isRude(name)) return fail(T.errors.rudeName);
+  saveProfile({ name });
   state.busy = true; state.error = ''; render();
   try {
     let code;
@@ -156,7 +183,9 @@ async function joinGame(codeInput, asName) {
   const name = cleanWord(asName || state.name);
   const code = String(codeInput || '').trim().toUpperCase();
   if (!name) return fail(T.errors.nameFirst);
+  if (isRude(name)) return fail(T.errors.rudeName);
   if (!/^[A-Z]{4}$/.test(code)) return fail(T.errors.codeFormat);
+  saveProfile({ name });
   state.busy = true; state.error = ''; render();
   try {
     await runTransaction(db, async (tx) => {
@@ -198,6 +227,7 @@ async function submitWord(raw) {
   const g = state.game;
   const word = cleanWord(raw);
   if (!word) return fail(T.errors.wordFirst);
+  if (isRude(word)) return fail(T.errors.rudeWord);
   if (isUsed(word, g.used)) return fail(T.errors.used(word));
   const round = g.round;
   state.busy = true; state.error = ''; render();
@@ -384,20 +414,33 @@ async function newCrew() {
 
 // ---------- your games ----------
 function describeGame(g) {
-  const others = g.order.filter((u) => u !== state.uid).map((u) => g.players[u]?.name).filter(Boolean);
+  const others = g.order.filter((u) => u !== state.uid).map((u) => nameOf(g, u)).filter(Boolean);
   const G = T.games;
   const with_ = others.length ? G.with(listNames(others)) : G.justYou;
   if (!g.players[state.uid]) return { with_, status: g.removed?.includes(state.uid) ? G.removed : G.notIn, tone: 'muted' };
   if (g.status === 'lobby') return { with_, status: g.hostUid === state.uid ? G.startIt : G.waitingStart, tone: g.hostUid === state.uid ? 'hot' : 'muted' };
   if (g.status === 'won') return { with_, status: (g.wonBy === 'vote' ? G.closeEnough : G.forged)(g.winWord), tone: 'done' };
   if (!g.submitted?.[state.uid]) return { with_, status: G.yourTurn(g.round), tone: 'hot' };
-  const waiting = g.order.filter((u) => !g.submitted?.[u]).map((u) => g.players[u].name);
+  const waiting = g.order.filter((u) => !g.submitted?.[u]).map((u) => nameOf(g, u));
   return { with_, status: waiting.length ? G.waitingOn(listNames(waiting)) : G.revealing, tone: 'muted' };
 }
 
 async function loadSummaries() {
+  // Games this player is in, from any phone they've signed in on.
+  try {
+    const mine = await getDocs(query(collection(db, 'games'), where('order', 'array-contains', state.uid), limit(30)));
+    const list = store.get('games', []);
+    const known = new Set(list.map((x) => x.code));
+    mine.forEach((d) => {
+      const g = d.data();
+      state.summaries[g.code] = describeGame(g);
+      if (!known.has(g.code)) list.push({ code: g.code, at: g.createdAt?.toMillis?.() || 0 });
+    });
+    list.sort((a, b) => b.at - a.at);
+    store.set('games', list.slice(0, 12));
+  } catch (e) { console.warn('games list', e); }
   const games = store.get('games', []);
-  await Promise.all(games.map(async ({ code }) => {
+  await Promise.all(games.filter(({ code }) => !state.summaries[code]).map(async ({ code }) => {
     try {
       const snap = await getDoc(gameRef(code));
       state.summaries[code] = snap.exists() ? describeGame(snap.data()) : { with_: T.games.ended, status: T.games.gone, tone: 'muted', gone: true };
@@ -409,6 +452,127 @@ async function loadSummaries() {
 function forgetGame(code) {
   store.set('games', store.get('games', []).filter((g) => g.code !== code));
   delete state.summaries[code];
+  render();
+}
+
+// ---------- account ----------
+const profileRef = (uid) => doc(db, 'users', uid);
+
+// Name and blocked list live on the account, so they follow you to other phones.
+function saveProfile(data) {
+  if (!state.uid) return;
+  setDoc(profileRef(state.uid), data, { merge: true }).catch((e) => console.warn('profile', e));
+}
+
+async function loadProfile() {
+  try {
+    const p = (await getDoc(profileRef(state.uid))).data();
+    if (!p) { if (cleanWord(state.name)) saveProfile({ name: cleanWord(state.name), blocked: [...state.blocked] }); return; }
+    if (state.account && p.name) { state.name = p.name; store.set('name', p.name); }
+    if (p.blocked?.length) { p.blocked.forEach((u) => state.blocked.add(u)); store.set('blocked', [...state.blocked]); }
+    render();
+  } catch (e) { console.warn('profile', e); }
+}
+
+function accountFail(e) {
+  console.error(e);
+  const msg = T.account.errors[e?.code];
+  state.accountError = msg === undefined ? T.errors.generic : msg;
+  state.busy = false;
+  render();
+}
+
+// After signing in: either this guest became the account (same games), or we switched to an
+// account from another phone and the server is bringing this phone's games along.
+function afterSignIn(res) {
+  state.busy = false;
+  if (!res || res.status === 'redirecting') return;
+  state.showAccount = false; state.accountError = ''; state.accountNote = '';
+  state.account = accountOf(auth.currentUser);
+  if (state.name) saveProfile({ name: cleanWord(state.name) });
+  if (res.status === 'switched') {
+    toast(T.account.moving);
+    watchMerge(db, res.uid, (n) => { toast(T.account.moved(n)); loadSummaries(); if (state.code) openGame(state.code); });
+  } else {
+    toast(res.status === 'linked' ? T.account.welcome : T.account.welcomeBack);
+  }
+  render();
+}
+
+async function signInGoogle() {
+  state.busy = true; state.accountError = ''; render();
+  try { afterSignIn(await googleSignIn(auth, db)); } catch (e) { accountFail(e); }
+}
+
+async function signInEmail(email, password) {
+  state.busy = true; state.accountError = ''; state.accountNote = ''; render();
+  try {
+    afterSignIn(state.accountMode === 'create' ? await emailCreate(auth, email, password) : await emailSignIn(auth, db, email, password));
+  } catch (e) { accountFail(e); }
+}
+
+async function forgotPassword() {
+  const email = document.getElementById('acct-email')?.value.trim();
+  if (!email) { state.accountError = T.account.needEmail; render(); return; }
+  try {
+    await resetPassword(auth, email);
+    state.accountError = ''; state.accountNote = T.account.resetSent(email); render();
+  } catch (e) { accountFail(e); }
+}
+
+// Signing out or deleting leaves you as a fresh guest on this phone.
+function clearLocal() {
+  ['games', 'blocked', 'alertsAsked'].forEach((k) => { try { localStorage.removeItem('samesies.' + k); } catch { /* private mode */ } });
+  state.blocked = new Set(); state.summaries = {};
+}
+
+async function signOutTap() {
+  if (!confirm(T.account.confirmSignOut)) return;
+  try {
+    await turnOffAlerts(fb, db, state.uid);
+    clearLocal();
+    state.showSettings = false; state.uid = null; state.account = null;
+    await signOutNow(auth);
+    toast(T.account.signedOut);
+  } catch (e) { fail(e); }
+}
+
+async function deleteAccountTap() {
+  if (!confirm(T.del.confirm)) return;
+  try {
+    await turnOffAlerts(fb, db, state.uid);
+    await requestDelete(db, state.uid);
+    clearLocal();
+    state.name = ''; store.set('name', '');
+    state.showSettings = false; state.uid = null; state.account = null;
+    await signOutNow(auth);
+    toast(T.del.done);
+  } catch (e) { fail(e); }
+}
+
+// ---------- report and block ----------
+async function sendReport(reason, note) {
+  const g = state.game;
+  const uid = state.reportFor;
+  const words = g.history.flatMap((h) => h.words.filter((w) => w.uid === uid).map((w) => w.word));
+  try {
+    await addDoc(collection(db, 'reports'), {
+      by: state.uid, byName: g.players[state.uid]?.name || '',
+      game: g.code, reported: uid, reportedName: g.players[uid]?.name || '',
+      words, reason, note: String(note || '').slice(0, 500), at: serverTimestamp(), handled: false,
+    });
+    state.reportFor = null;
+    toast(T.report.sent);
+  } catch (e) { fail(e); }
+}
+
+function toggleBlock(uid) {
+  const name = state.game?.players[uid]?.name || T.thisPlayer;
+  if (state.blocked.has(uid)) { state.blocked.delete(uid); toast(T.report.unblocked(name)); }
+  else { state.blocked.add(uid); toast(T.report.blocked(name)); }
+  store.set('blocked', [...state.blocked]);
+  saveProfile({ blocked: [...state.blocked] });
+  state.reportFor = null;
   render();
 }
 
@@ -583,6 +747,7 @@ function viewHome() {
       const turns = games.filter((x) => state.summaries[x.code]?.tone === 'hot').length;
       return `<button class="btn soft games-btn" data-act="games">${T.games.button(games.length)}${turns ? `<span class="turn-pill">${T.games.needYou(turns)}</span>` : ''}</button>`;
     })() : ''}
+    ${!state.account && games.length ? `<button class="linkish fine save-games" data-act="account">${T.home.saveGames}</button>` : ''}
     <p class="fine">${T.home.fine}</p>
     <p class="fine maker">${T.home.maker}</p>
   </main>`;
@@ -598,7 +763,7 @@ function viewJoin(g) {
     <div class="hero tight">
       ${art('logo', 170, 'hero-logo')}
       <h1 class="wordmark small">Brain<b>smith</b></h1>
-      <p class="tagline">${T.join.invited(esc(g.players[g.hostUid]?.name || T.aFriend), esc(g.code))}</p>
+      <p class="tagline">${T.join.invited(esc(nameOf(g, g.hostUid) || T.aFriend), esc(g.code))}</p>
     </div>
     <div class="grow"></div>
     ${started ? `<p class="notice">${T.join.started}</p>
@@ -630,14 +795,15 @@ function viewLobby(g) {
       ${g.order.map((u) => `
         <div class="player">
           <div class="dot done" style="background:${colorOf(g, u)}">${checkIcon}</div>
-          <span class="pname">${esc(g.players[u].name)}${u === state.uid ? T.you : ''}</span>
+          <span class="pname">${esc(nameOf(g, u))}${u === state.uid ? T.you : ''}</span>
           ${u === g.hostUid ? `<span class="muted small">${T.host}</span>` : ''}
+          ${moreButton(g, u)}
         </div>`).join('')}
     </section>
     <div class="grow"></div>
     ${isHost
       ? `<button class="btn primary" data-act="start" ${enough ? '' : 'disabled'}>${enough ? T.lobby.startNow : T.lobby.needMore}</button>`
-      : `<p class="fine">${T.lobby.waitingFor(esc(g.players[g.hostUid]?.name || T.theHost))}</p>`}
+      : `<p class="fine">${T.lobby.waitingFor(esc(nameOf(g, g.hostUid) || T.theHost))}</p>`}
   </main>`;
 }
 
@@ -652,7 +818,7 @@ function viewRound(g) {
     <section class="card center-text">
       ${prev ? `
         <span class="muted">${T.round.connect}</span>
-        <div class="word-chips">${prev.words.map((w) => `<span class="word-chip" style="--pc:${colorOf(g, w.uid)}">${esc(w.word)}${reactionBadges(g, prev.round, w.uid)}</span>`).join('')}</div>
+        <div class="word-chips">${prev.words.map((w) => `<span class="word-chip" style="--pc:${colorOf(g, w.uid)}">${esc(wordOf(w))}${reactionBadges(g, prev.round, w.uid)}</span>`).join('')}</div>
         ${prev.dealt ? `<div class="defs">${prev.words.map((w) => `<span><strong>${esc(w.word)}:</strong> ${esc(w.def)}</span>`).join('')}</div>` : ''}
         ${g.vote?.round === prev.round || prev.dealt ? '' : `<button class="linkish close-link" data-act="vote">${T.round.askClose}</button>`}`
       : `
@@ -664,7 +830,7 @@ function viewRound(g) {
       <section class="locked">
         <span class="muted">${T.round.lockedIn}</span>
         <div class="locked-word">${esc(state.mySub?.round === g.round ? state.mySub.word : '✓')}</div>
-        <span class="muted small">${waitingOn.length ? T.round.waitingOn(waitingOn.map((u) => esc(g.players[u].name)).join(', ')) : T.round.revealing}</span>
+        <span class="muted small">${waitingOn.length ? T.round.waitingOn(waitingOn.map((u) => esc(nameOf(g, u))).join(', ')) : T.round.revealing}</span>
       </section>
       ${waitingOn.length ? viewAlertAsk() : ''}`
     : `
@@ -687,10 +853,10 @@ function viewRound(g) {
         return `
         <div class="player">
           ${done ? `<div class="dot done" style="background:${colorOf(g, u)}">${checkIcon}</div>` : `<div class="dot" style="border-color:${colorOf(g, u)}"></div>`}
-          <span class="pname">${esc(g.players[u].name)}${me ? T.you : ''}</span>
-          ${done ? `<span class="muted small">${T.round.playerLocked}</span>`
+          <span class="pname">${esc(nameOf(g, u))}${me ? T.you : ''}</span>
+          ${done ? `<span class="muted small">${T.round.playerLocked}</span>${moreButton(g, u)}`
             : me ? `<span class="muted small">${T.round.thinking}</span>`
-            : `<button class="btn nudge" data-act="nudge" data-uid="${esc(u)}">${T.round.nudge}</button>${canRemove ? `<button class="icon-btn soft remove" data-act="remove" data-uid="${esc(u)}" aria-label="${T.a11y.removePlayer(esc(g.players[u].name))}">${closeIcon}</button>` : ''}`}
+            : `<button class="btn nudge" data-act="nudge" data-uid="${esc(u)}">${T.round.nudge}</button>${canRemove ? `<button class="icon-btn soft remove" data-act="remove" data-uid="${esc(u)}" aria-label="${T.a11y.removePlayer(esc(nameOf(g, u)))}">${closeIcon}</button>` : ''}${moreButton(g, u)}`}
         </div>`;
       }).join('')}
     </section>
@@ -710,7 +876,7 @@ function viewReveal(g, entry) {
   const groups = matchGroups(entry.words);
   const matched = new Set(groups.flat().map((w) => w.uid));
   const msg = groups.length
-    ? groups.map((grp) => T.reveal.said(listNames(grp.map((w) => esc(w.name))), grp.length === 2, esc(grp[0].word))).join('<br>')
+    ? groups.map((grp) => T.reveal.said(listNames(grp.map((w) => esc(whoOf(w)))), grp.length === 2, esc(wordOf(grp[0])))).join('<br>')
     : '';
   if (entry.dealt) return viewDealt(g, entry);
   const sub = groups.length
@@ -722,8 +888,8 @@ function viewReveal(g, entry) {
     <section class="stack reveal">
       ${entry.words.map((w) => `
         <div class="reveal-card${matched.has(w.uid) ? ' matched' : ''}" style="--pc:${colorOf(g, w.uid)}">
-          <span class="rname">${esc(w.name)}</span>
-          <span class="rword">${esc(w.word)}</span>
+          <span class="rname">${esc(whoOf(w))}</span>
+          <span class="rword">${esc(wordOf(w))}</span>
           ${reactionRow(g, entry.round, w.uid)}
         </div>`).join('')}
     </section>
@@ -745,7 +911,7 @@ function viewDealt(g, entry) {
     <section class="stack reveal">
       ${entry.words.map((w) => `
         <div class="reveal-card" style="--pc:${colorOf(g, w.uid)}">
-          <span class="rname">${T.dealt.got(esc(w.name))}</span>
+          <span class="rname">${T.dealt.got(esc(whoOf(w)))}</span>
           <span class="rword">${esc(w.word)}</span>
           <span class="rdef">${esc(w.def)}</span>
         </div>`).join('')}
@@ -760,13 +926,13 @@ function viewDealt(g, entry) {
 
 function voteCard(g) {
   const v = g.vote;
-  const asker = esc(g.players[v.by]?.name || T.someone);
+  const asker = esc(nameOf(g, v.by) || T.someone);
   if (v.result === 'no') {
-    const naysayer = esc(g.players[Object.keys(v.no)[0]]?.name || T.someone);
+    const naysayer = esc(nameOf(g, Object.keys(v.no)[0]) || T.someone);
     return `<section class="vote done"><span class="muted">${T.vote.playOn(naysayer)}</span></section>`;
   }
   const iVoted = v.yes[state.uid] || v.no[state.uid];
-  const waiting = g.order.filter((u) => !v.yes[u] && !v.no[u]).map((u) => esc(g.players[u].name));
+  const waiting = g.order.filter((u) => !v.yes[u] && !v.no[u]).map((u) => esc(nameOf(g, u)));
   return `
   <section class="vote" aria-live="polite">
     <span class="vote-title">${T.vote.title}</span>
@@ -778,7 +944,7 @@ function voteCard(g) {
 }
 
 function viewWon(g) {
-  const names = g.order.map((u) => g.players[u].name);
+  const names = g.order.map((u) => nameOf(g, u));
   const nameList = listNames(names);
   return `
   <main class="screen win">
@@ -792,7 +958,7 @@ function viewWon(g) {
     <div class="grow"></div>
     <section class="chain">
       <span class="eyebrow light">${T.won.howYouGot}</span>
-      ${g.history.map((h, i) => `<span class="${i === g.history.length - 1 ? 'strong' : ''}">${h.words.map((w) => esc(w.word)).join(' · ')}</span>`).join('')}
+      ${g.history.map((h, i) => `<span class="${i === g.history.length - 1 ? 'strong' : ''}">${h.words.map((w) => esc(wordOf(w))).join(' · ')}</span>`).join('')}
     </section>
     ${state.moving ? `<p class="notice move-note">${T.move.won}</p>` : ''}
     <button class="btn coral" data-act="sharegame">${T.won.share}</button>
@@ -970,7 +1136,7 @@ function viewSettingsSheet() {
   const games = store.get('games', []);
   const S = T.settings;
   const row = (act, label, sub = '', extra = '') => `
-        <button class="set-row" data-act="${act}" ${extra}>
+        <button ${extra.includes('class=') ? '' : 'class="set-row"'} data-act="${act}" ${extra}>
           <span class="set-text"><span class="set-label">${label}</span>${sub ? `<span class="set-sub">${sub}</span>` : ''}</span>${chevron}
         </button>`;
   return `
@@ -980,6 +1146,13 @@ function viewSettingsSheet() {
       <div class="row between">
         <h2 id="settings-title" class="h-sheet">${S.title}</h2>
         <button class="icon-btn soft" data-act="closesettings" aria-label="${T.a11y.close}">${closeIcon}</button>
+      </div>
+
+      <div class="set-group">
+        ${state.account
+          ? `<div class="set-row static"><span class="set-text"><span class="set-label">${esc(S.signedIn(state.account.email))}</span><span class="set-sub">${S.signedInSub}</span></span></div>
+        ${row('signout', S.signOut)}`
+          : row('account', S.account, S.accountSub, 'class="set-row hot-row"')}
       </div>
 
       <form class="set-group" data-form="setname">
@@ -1007,7 +1180,73 @@ function viewSettingsSheet() {
         <div class="set-row disabled" aria-disabled="true"><span class="set-text"><span class="set-label">${S.restore}</span><span class="set-sub">${S.restoreSoon}</span></span></div>
       </div>
 
+      <div class="set-group">
+        ${row('delete-account', S.deleteAccount, S.deleteSub, 'class="set-row danger-row"')}
+      </div>
+
       <p class="fine maker">${S.contact}<br>${S.footer}</p>
+    </div>
+  </div>`;
+}
+
+function viewAccountSheet() {
+  const A = T.account;
+  const creating = state.accountMode === 'create';
+  return `
+  <div class="sheet-backdrop" data-act="closeaccount">
+    <div class="sheet account" role="dialog" aria-modal="true" aria-labelledby="account-title" data-stop>
+      <div class="grabber"></div>
+      <div class="row between">
+        <h2 id="account-title" class="h-sheet">${A.title}</h2>
+        <button class="icon-btn soft" data-act="closeaccount" aria-label="${T.a11y.close}">${closeIcon}</button>
+      </div>
+      <p class="muted">${A.body}</p>
+      <button class="btn google" data-act="google" ${state.busy ? 'disabled' : ''}>${googleIcon}${A.google}</button>
+      <div class="or"><span></span>${A.or}<span></span></div>
+      <form class="stack tight" data-form="email">
+        <label for="acct-email" class="sr-only">${A.email}</label>
+        <input id="acct-email" name="email" type="email" class="input" autocomplete="email" autocapitalize="off" placeholder="${A.email}" required>
+        <label for="acct-pass" class="sr-only">${A.password}</label>
+        <input id="acct-pass" name="password" type="password" class="input" autocomplete="${creating ? 'new-password' : 'current-password'}" minlength="6" placeholder="${creating ? A.passwordNew : A.password}" required>
+        <button class="btn primary" ${state.busy ? 'disabled' : ''}>${state.busy ? A.working : creating ? A.create : A.signIn}</button>
+      </form>
+      ${state.accountError ? `<p class="error" role="alert">${esc(state.accountError)}</p>` : ''}
+      ${state.accountNote ? `<p class="notice small-note" role="status">${esc(state.accountNote)}</p>` : ''}
+      <div class="row between acct-links">
+        <button class="linkish acct-link" data-act="account-mode">${creating ? A.haveOne : A.needOne}</button>
+        ${creating ? '' : `<button class="linkish acct-link" data-act="forgot">${A.forgot}</button>`}
+      </div>
+    </div>
+  </div>`;
+}
+
+function viewReportSheet(g) {
+  const R = T.report;
+  const uid = state.reportFor;
+  const name = esc(g.players[uid]?.name || T.thisPlayer);
+  const blocked = state.blocked.has(uid);
+  const body = state.reportStep === 'report'
+    ? `<form class="stack tight" data-form="report">
+        <span class="label">${R.what}</span>
+        ${R.reasons.map((r, i) => `<label class="choice"><input type="radio" name="reason" value="${esc(r)}" ${i === 0 ? 'checked' : ''}><span>${esc(r)}</span></label>`).join('')}
+        <label for="report-note" class="sr-only">${R.note}</label>
+        <input id="report-note" name="note" class="input" maxlength="500" placeholder="${R.note}">
+        ${blocked ? '' : `<label class="choice"><input type="checkbox" name="block"><span>${R.alsoBlock(name)}</span></label>`}
+        <button class="btn primary">${R.send}</button>
+      </form>`
+    : `<div class="set-group">
+        <button class="set-row" data-act="report-start"><span class="set-text"><span class="set-label">${R.reportBtn(name)}</span><span class="set-sub">${R.reportSub}</span></span>${chevron}</button>
+        <button class="set-row" data-act="block" data-uid="${esc(uid)}"><span class="set-text"><span class="set-label">${blocked ? R.unblockBtn(name) : R.blockBtn(name)}</span><span class="set-sub">${blocked ? R.unblockSub : R.blockSub}</span></span>${chevron}</button>
+      </div>`;
+  return `
+  <div class="sheet-backdrop" data-act="closereport">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="report-title" data-stop>
+      <div class="grabber"></div>
+      <div class="row between">
+        <h2 id="report-title" class="h-sheet">${state.reportStep === 'report' ? R.title(name) : name}</h2>
+        <button class="icon-btn soft" data-act="closereport" aria-label="${T.a11y.close}">${closeIcon}</button>
+      </div>
+      ${body}
     </div>
   </div>`;
 }
@@ -1025,7 +1264,7 @@ function viewUsedSheet(g) {
       ${g.history.length ? g.history.map((h) => `
         <div class="stack tight">
           <span class="eyebrow">${T.used.round(h.round)}</span>
-          <div class="chips">${h.words.filter((w, i, all) => all.findIndex((x) => normalize(x.word) === normalize(w.word)) === i).map((w) => `<span class="chip static">${esc(w.word)}</span>`).join('')}</div>
+          <div class="chips">${h.words.filter((w, i, all) => all.findIndex((x) => normalize(x.word) === normalize(w.word)) === i).map((w) => `<span class="chip static">${esc(wordOf(w))}</span>`).join('')}</div>
         </div>`).join('') : `<p class="muted">${T.used.none}</p>`}
     </div>
   </div>`;
@@ -1067,7 +1306,9 @@ function render() {
   $app.innerHTML = currentView()
     + (state.showUsed && g ? viewUsedSheet(g) : '')
     + (state.showGames && !state.code ? viewGamesSheet() : '')
-    + (state.showSettings && !state.code ? viewSettingsSheet() : '')
+    + (state.showSettings && !state.code && !state.showAccount ? viewSettingsSheet() : '')
+    + (state.showAccount && !state.code ? viewAccountSheet() : '')
+    + (state.reportFor && g?.players[state.reportFor] ? viewReportSheet(g) : '')
     + (state.tour !== null ? viewTour() : '')
     + (state.toast ? `<div class="toast" role="status">${esc(state.toast)}</div>` : '');
 
@@ -1118,10 +1359,16 @@ $app.addEventListener('submit', (e) => {
   if (form === 'join') joinGame(data.get('code'));
   if (form === 'joinlink') joinGame(state.code);
   if (form === 'word') submitWord(data.get('word'));
+  if (form === 'email') signInEmail(String(data.get('email') || ''), String(data.get('password') || ''));
+  if (form === 'report') {
+    const uid = state.reportFor;
+    sendReport(String(data.get('reason') || ''), data.get('note')).then(() => { if (data.get('block') && !state.blocked.has(uid)) { state.reportFor = uid; toggleBlock(uid); } else render(); });
+  }
   if (form === 'setname') {
     const n = cleanWord(data.get('setname') || '');
     if (!n) { toast(T.toasts.nameFirst); return; }
-    state.name = n; store.set('name', n);
+    if (isRude(n)) { toast(T.errors.rudeName); return; }
+    state.name = n; store.set('name', n); saveProfile({ name: n });
     const home = document.getElementById('name'); if (home) home.value = n;
     toast(T.toasts.nameSaved); render();
   }
@@ -1146,6 +1393,17 @@ $app.addEventListener('click', async (e) => {
   if (act === 'settings-tour') { state.showSettings = false; state.tour = 0; render(); }
   if (act === 'closegames' && !(e.target.closest('[data-stop]') && !e.target.closest('button'))) { state.showGames = false; render(); }
   if (act === 'forget') forgetGame(el.dataset.code);
+  if (act === 'account') { state.showAccount = true; state.accountError = ''; state.accountNote = ''; render(); }
+  if (act === 'closeaccount' && (el.tagName === 'BUTTON' || !e.target.closest('[data-stop]'))) { state.showAccount = false; render(); }
+  if (act === 'account-mode') { state.accountMode = state.accountMode === 'create' ? 'signin' : 'create'; state.accountError = ''; state.accountNote = ''; render(); }
+  if (act === 'google') signInGoogle();
+  if (act === 'forgot') forgotPassword();
+  if (act === 'signout') signOutTap();
+  if (act === 'delete-account') deleteAccountTap();
+  if (act === 'player-menu') { state.reportFor = el.dataset.uid; state.reportStep = 'menu'; render(); }
+  if (act === 'closereport' && (el.tagName === 'BUTTON' || !e.target.closest('[data-stop]'))) { state.reportFor = null; render(); }
+  if (act === 'report-start') { state.reportStep = 'report'; render(); }
+  if (act === 'block') toggleBlock(el.dataset.uid);
   if (act === 'remove') removePlayer(el.dataset.uid);
   if (act === 'react') react(Number(el.dataset.round), el.dataset.uid, el.dataset.emoji);
   if (act === 'daily') createGame({ daily: true });
@@ -1187,6 +1445,8 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && state.showUsed) { state.showUsed = false; render(); }
   if (e.key === 'Escape' && state.showGames) { state.showGames = false; render(); }
   if (e.key === 'Escape' && state.showSettings) { state.showSettings = false; render(); }
+  if (e.key === 'Escape' && state.showAccount) { state.showAccount = false; render(); }
+  if (e.key === 'Escape' && state.reportFor) { state.reportFor = null; render(); }
   if (state.tour !== null && e.key === 'ArrowRight' && state.tour < TOUR.length - 1) goTour(state.tour + 1);
   if (state.tour !== null && e.key === 'ArrowLeft' && state.tour > 0) goTour(state.tour - 1);
   if (e.key === 'Escape' && state.tour !== null) { state.tour = null; store.set('toured', true); render(); }
@@ -1212,20 +1472,30 @@ async function checkMove() {
 
 // ---------- boot ----------
 render();
+let guestTried = false;
 onAuthStateChanged(auth, (user) => {
-  if (user) {
-    state.uid = user.uid;
-    if (state.code && !unsubGame) openGame(state.code);
-    else { render(); loadSummaries(); }
-    checkMove();
-    refreshAlerts(fb, db, user.uid);
+  if (!user) {
+    // Nobody signed in on this phone yet (or just signed out): play as a guest.
+    state.uid = null; state.account = null; render();
+    signInAnonymously(auth).catch((e) => {
+      console.error(e);
+      if (!guestTried) { state.authError = T.errors.connect; render(); }
+    });
+    guestTried = true;
+    return;
   }
+  const changed = state.uid !== user.uid;
+  state.uid = user.uid;
+  state.account = accountOf(user);
+  if (!changed) { render(); return; }
+  if (state.code) openGame(state.code);
+  else { render(); loadSummaries(); }
+  loadProfile();
+  checkMove();
+  refreshAlerts(fb, db, user.uid);
 });
-signInAnonymously(auth).catch((e) => {
-  console.error(e);
-  state.authError = T.errors.connect;
-  render();
-});
+// Coming back from Google sign-in (Home Screen app).
+finishRedirect(auth, db).then(afterSignIn).catch(accountFail);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

@@ -20,6 +20,8 @@ export const T = {
     wordFirst: 'Type a word first.',
     used: (word) => `"${word}" has already been used. Pick another!`,
     connect: 'Could not connect to Brainsmith. Check your connection and refresh.',
+    rudeWord: 'Let’s keep it family-friendly. Try another word.',
+    rudeName: 'Let’s keep names family-friendly. Try another.',
   },
 
   toasts: {
@@ -102,6 +104,7 @@ export const T = {
     codePlaceholder: 'Game code',
     join: 'Join',
     fine: '2 to 5 players · no sign-up · no ads',
+    saveGames: 'Playing on more than one phone? <b>Sign in</b> to keep your games everywhere.', // html
     maker: 'a Padre Smitty creation',
   },
 
@@ -202,6 +205,13 @@ export const T = {
 
   settings: {
     title: 'Settings',
+    account: 'Save your games',
+    accountSub: 'Sign in so your games follow you to any phone',
+    signedIn: (email) => `Signed in${email ? ` as ${email}` : ''}`,
+    signedInSub: 'Your games follow you to any phone',
+    signOut: 'Sign out',
+    deleteAccount: 'Delete my account',
+    deleteSub: 'Erases your name, games list and alerts',
     yourName: 'Your name',
     save: 'Save',
     nameNote: 'Used for new games you start or join.',
@@ -257,6 +267,74 @@ export const T = {
       ['list', 'Used words', 'shows every word played so far.'],
       ['😂', 'React', 'to anyone’s word after the reveal.'],
     ],
+  },
+
+  // Sign-in
+  account: {
+    title: 'Save your games',
+    body: 'Sign in and your games, name and alerts follow you to any phone or tablet, including the Home Screen app.',
+    google: 'Continue with Google',
+    or: 'or use email',
+    email: 'Email',
+    password: 'Password',
+    passwordNew: 'Make a password (6+ characters)',
+    create: 'Create account',
+    signIn: 'Sign in',
+    haveOne: 'Already have an account? <b>Sign in</b>', // html
+    needOne: 'New here? <b>Create an account</b>', // html
+    forgot: 'Forgot password?',
+    resetSent: (email) => `Check ${email} for a link to pick a new password.`,
+    needEmail: 'Type your email first, then tap Forgot password.',
+    working: 'One sec…',
+    welcome: 'Signed in. Your games are saved.',
+    welcomeBack: 'Welcome back!',
+    moving: 'Bringing this phone’s games along…',
+    moved: (n) => (n ? `Brought ${n} game${n === 1 ? '' : 's'} along. All set!` : 'Welcome back! All set.'),
+    signedOut: 'Signed out. You’re playing as a guest now.',
+    confirmSignOut: 'Sign out? Your games stay saved in your account. Sign back in anytime to get them.',
+    errors: {
+      'auth/email-already-in-use': 'That email already has an account. Tap Sign in instead.',
+      'auth/invalid-email': 'That email doesn’t look right.',
+      'auth/weak-password': 'Pick a password with at least 6 characters.',
+      'auth/missing-password': 'Type a password.',
+      'auth/invalid-credential': 'That email and password don’t match.',
+      'auth/wrong-password': 'That email and password don’t match.',
+      'auth/user-not-found': 'No account with that email. Tap Create an account.',
+      'auth/too-many-requests': 'Too many tries. Wait a few minutes, then try again.',
+      'auth/popup-closed-by-user': '',
+      'auth/cancelled-popup-request': '',
+      'auth/network-request-failed': 'No connection. Check your internet and try again.',
+      'auth/operation-not-allowed': 'That sign-in isn’t switched on yet. Try the other way.',
+    },
+  },
+
+  // Delete my account
+  del: {
+    confirm: 'Delete your account? Your name is taken out of every game and your games list, alerts and sign-in are erased. This can’t be undone.',
+    done: 'Your account is deleted. Thanks for playing.',
+  },
+
+  // Report or block a player
+  report: {
+    menu: (name) => name,
+    reportBtn: (name) => `Report ${name}`,
+    reportSub: 'Tell us about a mean name or word',
+    blockBtn: (name) => `Block ${name}`,
+    blockSub: 'Hides their name and words on your screen',
+    unblockBtn: (name) => `Unblock ${name}`,
+    unblockSub: 'Shows their name and words again',
+    title: (name) => `Report ${name}`,
+    what: 'What’s wrong?',
+    reasons: ['Mean or hateful word', 'Gross or not family-friendly', 'Rude name', 'Something else'],
+    note: 'Anything else? (optional)',
+    send: 'Send report',
+    sent: 'Thanks for telling us. We read every report.',
+    alsoBlock: (name) => `Block ${name} too`,
+    blocked: (name) => `${name} is blocked. You won’t see their name or words.`,
+    unblocked: (name) => `${name} is unblocked.`,
+    hiddenName: 'Blocked player',
+    hiddenWord: 'hidden',
+    more: (name) => `More options for ${name}`,
   },
 
   // Moving day (old address only)

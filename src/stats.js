@@ -1,7 +1,7 @@
 // Private stats for the game's creator: totals only, never anyone's words.
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, query, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
 import { firebaseConfig } from './firebase-config.js';
 
 const fb = initializeApp(firebaseConfig);
@@ -38,7 +38,39 @@ function chart(perDay) {
     <text x="0" y="11" class="axis">${max} max</text>${bars}</svg>`;
 }
 
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Reports of a player or word, newest first. Open ones show at the top until marked handled.
+async function loadReports() {
+  const box = $('reports');
+  try {
+    const snap = await getDocs(query(collection(db, 'reports'), orderBy('at', 'desc'), limit(40)));
+    const open = snap.docs.filter((d) => !d.data().handled);
+    if (!open.length) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = `<h2>REPORTS TO LOOK AT · ${open.length}</h2>${open.map((d) => {
+      const r = d.data();
+      const when = r.at?.toDate?.().toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) || '';
+      return `<div class="report">
+        <b>${esc(r.reportedName || 'Someone')}: ${esc(r.reason)}</b>
+        ${r.words?.length ? `<span>Their words: ${esc(r.words.join(', '))}</span>` : ''}
+        ${r.note ? `<span>“${esc(r.note)}”</span>` : ''}
+        <span class="meta">From ${esc(r.byName || 'a player')} · game ${esc(r.game)} · ${esc(when)}</span>
+        <button data-report="${d.id}">Mark handled</button>
+      </div>`;
+    }).join('')}`;
+  } catch (e) { box.hidden = true; }
+}
+document.addEventListener('click', async (e) => {
+  const id = e.target.closest?.('[data-report]')?.dataset.report;
+  if (!id) return;
+  e.target.disabled = true;
+  try { await updateDoc(doc(db, 'reports', id), { handled: true }); } catch { /* try again */ }
+  loadReports();
+});
+
 async function load() {
+  loadReports();
   $('status').textContent = 'Counting…';
   let snap;
   try {
