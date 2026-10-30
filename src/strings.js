@@ -64,8 +64,8 @@ export const T = {
   },
 
   share: {
-    head: (word, n) => `🧠 Brainsmith: we forged "${word}" in ${plural(n, 'round', 'rounds')}!`,
-    headVote: (word, n) => `🧠 Brainsmith: close enough on "${word}" in ${plural(n, 'round', 'rounds')}!`,
+    head: (word, n, where = '') => `🧠 Brainsmith: we forged "${word}" in ${plural(n, 'round', 'rounds')}${where}!`,
+    headVote: (word, n, where = '') => `🧠 Brainsmith: close enough on "${word}" in ${plural(n, 'round', 'rounds')}${where}!`,
     playWithUs: 'Play with us:',
     invite: (code) => `Play Brainsmith with me! Code ${code}`,
   },
@@ -358,5 +358,32 @@ export const T = {
     offToast: 'Alerts off. Peace and quiet.',
     notNow: 'No alerts for now. Turn them on anytime in Settings.',
     failed: 'Couldn’t turn on alerts. Try again in Settings.',
+  },
+
+  // Packs. Names, shouts and words are Smitty-approved; check the pack sheet before changing any.
+  packs: {
+    pickTitle: 'Pick a pack',
+    pickSub: 'The pack deals your first words. After that, anything goes.',
+    free: 'FREE',
+    plus: 'PLUS',
+    soon: 'Coming with Plus',
+    soonToast: 'Creature Feature comes with Brainsmith Plus. Soon!',
+    forgedIn: (name) => `Forged in ${name}`,
+    shareIn: (name) => ` in ${name}`, // goes inside the share line, before the !
+    open: { name: 'Wide Open', blurb: 'No pack. Anything goes from the very first word.' },
+    daily: { name: 'Weird Daily Words', blurb: 'Five redonkulous words a day, the same for everyone.' },
+    zoo: {
+      name: 'The Odd Zoo',
+      blurb: 'Every one of these animals is real. We checked.',
+      dealtTitle: 'Welcome to The Odd Zoo!',
+      shouts: ['ROAR!', 'Hive mind!', 'Stampede!', 'Birds of a feather!', 'Same species!', 'Apex predators!', 'Top of the food chain!', 'Feeding frenzy!', 'GOAT!', 'Ah-OOOOO!'],
+    },
+    sports: {
+      name: 'Huddle Up',
+      blurb: 'Cheese rolling is a real sport. So is chess boxing. Good luck.',
+      dealtTitle: 'Huddle up!',
+      shouts: ['Score!', 'Homerun!', 'Swish!', 'Gold!', 'GG!', 'Game, set, match!', 'Goal!', 'Knockout!', 'Touchdown!', 'Hole in one!'],
+    },
+    monsters: { name: 'Creature Feature', blurb: 'Movie monsters, from the classics to the cult weirdos.' },
   },
 };

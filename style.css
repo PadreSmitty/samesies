@@ -492,3 +492,98 @@ body:has(.win) { background: #4B4DDB; }
 .player .more { width: 36px; height: 36px; margin-left: -6px; color: var(--faint); background: transparent; }
 .choice { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 14px; border-radius: 14px; background: var(--ground); font-weight: 500; cursor: pointer; }
 .choice input { width: 20px; height: 20px; accent-color: var(--indigo); flex-shrink: 0; }
+
+/* ---------- packs ---------- */
+/* picker */
+.pack-list { display: flex; flex-direction: column; gap: 10px; }
+.pack-tile {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; border: none; border-radius: 22px;
+  padding: 10px 16px 10px 10px; min-height: 104px; background: var(--ground); color: var(--ink);
+  transition: transform 0.08s ease;
+}
+.pack-tile:active:not(:disabled) { transform: scale(0.98); }
+.pack-art { width: 84px; height: 84px; flex-shrink: 0; border-radius: 16px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.pack-art .art { max-width: 76px; max-height: 76px; width: auto; height: auto; }
+.pack-text { display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0; }
+.pack-name { font-family: var(--display); font-weight: 800; font-size: 21px; line-height: 1.1; }
+.pack-blurb { font-size: 14px; line-height: 1.35; opacity: 0.85; }
+.pack-tag { align-self: flex-start; font-size: 11px; font-weight: 800; letter-spacing: 1px; padding: 4px 8px; border-radius: 999px; background: var(--indigo-soft); color: var(--indigo); }
+.pack-tag.plus { background: #FFB020; color: #1A1B3D; }
+.pt-open .pack-art { background: var(--indigo-soft); }
+.pt-daily .pack-art { background: var(--indigo-soft); }
+.pt-zoo { background: linear-gradient(135deg, #1E5A3A, #163F2A); color: #F4FAF3; }
+.pt-zoo .pack-art { background: #EAF4E9; }
+.pt-zoo .pack-tag { background: #F2A33A; color: #163F2A; }
+.pt-sports { background: linear-gradient(180deg, #3A2A86 0 22%, #1E8A4C 22% 100%); color: #fff; }
+.pt-sports .pack-art { background: #F4F1E6; }
+.pt-sports .pack-tag { background: #FFB21E; color: #14213D; }
+.pt-monsters { background: #1A1B3D; color: #fff; }
+.pt-monsters .pack-art { background: #2A2C5E; }
+.pt-monsters.locked .pack-art .art { filter: grayscale(0.35) brightness(0.85); }
+.pt-monsters .pack-blurb::before { content: '🔒 '; }
+
+/* a pack's logo always sits on a chalk-white card */
+.pack-logo { background: #FBFAF5; border-radius: 22px; padding: 10px 18px; box-shadow: 0 4px 0 rgba(0,0,0,0.12); display: flex; justify-content: center; }
+.pack-logo .art { height: auto; max-height: 130px; width: auto; max-width: 100%; }
+.win-pack { font-weight: 700; font-size: 15px; letter-spacing: 0.5px; opacity: 0.9; margin-top: -8px; }
+
+/* moving scenery behind the game */
+.pack-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.pack-bg canvas { width: 100%; height: 100%; display: block; }
+body[data-pack]:not([data-pack=""]) #app { position: relative; z-index: 1; }
+
+/* skins: one look in light and dark mode. Text on the background is light; cards are light with dark text. */
+body[data-pack="zoo"] {
+  --ground: #163F2A; --ink: #F4FAF3; --muted: #CFE6D2; --faint: #9CC4A4; --line: rgba(255,255,255,0.2);
+  --indigo: #F2A33A; --indigo-dark: #E0922A; --indigo-soft: rgba(255,255,255,0.14); --coral: #E0567A; --danger: #FFB3A8;
+  --card: #EAF4E9; --btn: #F2A33A; --btn-hover: #F7B455; --on-btn: #163F2A; --toast-bg: #EAF4E9; --toast-fg: #163F2A;
+  --cardback: repeating-linear-gradient(45deg, rgba(255,255,255,0.09) 0 7px, transparent 7px 14px), #2F7A4C;
+  --cardback-edge: #F2A33A;
+  background: linear-gradient(180deg, #1E5A3A 0%, #163F2A 55%, #0F2D1E 100%);
+  color-scheme: dark;
+}
+body[data-pack="zoo"] .pack-bg { background: radial-gradient(120% 45% at 50% 0%, rgba(242,163,58,0.28), transparent 60%), linear-gradient(180deg, #1E5A3A 0%, #163F2A 55%, #0F2D1E 100%); }
+body[data-pack="zoo"] :is(.card, .player, .reveal-card, .vote, .sheet, .input, .alert-ask, .icon-btn:not(.back)) {
+  --ink: #163F2A; --muted: #3F6B4C; --faint: #6F947A; --line: #C9DECB; --indigo: #2F7A4C; --indigo-soft: #D3E8D4; --ground: #D3E8D4;
+  --btn: #2F7A4C; --btn-hover: #276A41; --on-btn: #FFFFFF; --coral: #E0567A;
+  color: var(--ink);
+}
+
+body[data-pack="sports"] {
+  --ground: #1A7D44; --ink: #FFFFFF; --muted: #E3F3E8; --faint: #B5DCC2; --line: rgba(255,255,255,0.25);
+  --indigo: #FFB21E; --indigo-dark: #F0A000; --indigo-soft: rgba(0,0,0,0.18); --coral: #E23A4E; --danger: #FFD0D5;
+  --card: #F4F1E6; --btn: #FFB21E; --btn-hover: #FFC24A; --on-btn: #14213D; --toast-bg: #F4F1E6; --toast-fg: #14213D;
+  --cardback: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26'%3E%3Cg stroke='rgba(255,255,255,0.3)' stroke-width='1.6' fill='none' stroke-linecap='round'%3E%3Cpath d='M3 3l6 6M9 3l-6 6'/%3E%3Ccircle cx='19' cy='19' r='3.5'/%3E%3C/g%3E%3C/svg%3E") 0 0/26px 26px, linear-gradient(160deg, #E23A4E, #B8283A);
+  --cardback-edge: #FFFFFF;
+  background: #1A7D44;
+  color-scheme: dark;
+}
+body[data-pack="sports"] .pack-bg {
+  background:
+    radial-gradient(30% 10% at 3% 18%, rgba(255,248,210,0.45), transparent 70%),
+    radial-gradient(30% 10% at 97% 18%, rgba(255,248,210,0.45), transparent 70%),
+    linear-gradient(180deg, #2B1E6E 0, #3A2A86 22%, transparent 22.1%),
+    repeating-linear-gradient(180deg, #1E8A4C 0 48px, #1A7D44 48px 96px);
+}
+body[data-pack="sports"] :is(.card, .player, .reveal-card, .vote, .sheet, .input, .alert-ask, .icon-btn:not(.back)) {
+  --ink: #14213D; --muted: #4E566B; --faint: #7D8396; --line: #DDD8C6; --indigo: #1A7D44; --indigo-soft: #E2EEDF; --ground: #E9E5D6;
+  --btn: #1A7D44; --btn-hover: #166C3B; --on-btn: #FFFFFF; --coral: #E23A4E;
+  color: var(--ink);
+}
+/* the header sits up in the night sky: keep it readable */
+body[data-pack="sports"] .bar { text-shadow: 0 1px 2px rgba(0,0,0,0.35); }
+
+/* card backs during the reveal */
+body[data-pack]:not([data-pack=""]) .reveal-card::after { background: var(--cardback); box-shadow: inset 0 0 0 3px var(--cardback-edge); color: var(--cardback-edge); }
+body[data-pack]:not([data-pack=""]) .reveal-card.matched { box-shadow: inset 0 0 0 3px var(--coral); }
+
+/* win screen takes the pack's colors */
+body[data-pack="zoo"]:has(.win), body[data-pack="sports"]:has(.win) { background: var(--ground); }
+body[data-pack]:not([data-pack=""]) .screen.win { background: transparent; }
+body[data-pack]:not([data-pack=""]) .chain { background: rgba(0,0,0,0.28); }
+body[data-pack]:not([data-pack=""]) .win-title { color: var(--indigo); text-shadow: 0 3px 0 rgba(0,0,0,0.25); }
+body[data-pack]:not([data-pack=""]) .btn.white { color: var(--on-btn); }
+body[data-pack]:not([data-pack=""]) .btn.coral { background: var(--btn); color: var(--on-btn); }
+body[data-pack]:not([data-pack=""]) .win-art .art { filter: drop-shadow(0 4px 0 rgba(0,0,0,0.2)); }
+body[data-pack]:not([data-pack=""]) .badge { background: var(--indigo); color: var(--on-btn); }
+body[data-pack]:not([data-pack=""]) .so-close-names em { color: var(--indigo); }

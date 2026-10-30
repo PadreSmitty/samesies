@@ -1,6 +1,6 @@
 // Minimal service worker: lets Brainsmith be added to the home screen and opened like an app.
 // Network first so a new version always shows up; the cached copy is only a fallback.
-const CACHE = 'brainsmith-v5';
+const CACHE = 'brainsmith-v6';
 const SHELL = ['./', 'index.html', 'style.css', 'dist/app.js', 'manifest.webmanifest', 'icons/favicon.png', 'art/logo.webp'];
 
 self.addEventListener('install', (e) => {

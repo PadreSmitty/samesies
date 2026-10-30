@@ -10,10 +10,12 @@ import { isRude } from './rude.js';
 import { MIN_PLAYERS, MAX_PLAYERS, makeCode, normalize, cleanWord, isUsed, allMatch, nearlyMatch, commonWord } from './logic.js';
 import { STARTERS } from './starters.js';
 import { DAILY_WORDS } from './dailywords.js';
+import { PACKS, PICKER, TEASER, skinOf, deal, pickShout } from './packs.js';
 import { firebaseConfig } from './firebase-config.js';
 import { alertSupport, alertPermission, alertsOn, turnOnAlerts, turnOffAlerts, refreshAlerts } from './alerts.js';
 import { T } from './strings.js';
 import { unlockAudio, isMuted, setMuted, drumroll, closeSting, fanfare, confetti } from './fx.js';
+import { setPackBackdrop } from './backdrop.js';
 
 const fb = initializeApp(firebaseConfig);
 const auth = getAuth(fb);
@@ -48,6 +50,7 @@ const state = {
   showUsed: false,
   showGames: false,
   showSettings: false,
+  showPacks: false,
   account: null, // { email, google } when signed in, null for a guest
   showAccount: false,
   accountMode: 'create', // or 'signin'
@@ -109,7 +112,10 @@ function fail(err) {
 
 // Two overlapping circles, each rippling outward in fading rings: rounds of guesses meeting in the middle,
 // with a spark where the two minds meet.
-const ART = { logo: [409, 640], spark: [358, 360], bolt: [195, 360], hammer: [313, 360], bolts: [383, 360], burst: [343, 360], swing: [342, 360] };
+const ART = {
+  logo: [409, 640], spark: [358, 360], bolt: [195, 360], hammer: [313, 360], bolts: [383, 360], burst: [343, 360], swing: [342, 360],
+  'zoo-logo': [570, 600], 'zoo-art': [440, 360], 'sports-logo': [455, 600], 'sports-art': [348, 360], 'monsters-art': [308, 360],
+};
 const art = (name, h, cls = '') => { const [w0, h0] = ART[name]; return `<img class="art ${cls}" src="art/${name}.webp" width="${Math.round(w0 * h / h0)}" height="${h}" alt="" aria-hidden="true" decoding="async">`; };
 const helpIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.8"/><path d="M12 17.2h.01"/></svg>`;
 const listIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>`;
@@ -145,6 +151,17 @@ function dailyWords(key = todayKey()) {
   return Array.from({ length: MAX_PLAYERS }, (_, i) => DAILY_WORDS[dailyOrder[(day * MAX_PLAYERS + i) % dailyOrder.length]]);
 }
 
+// What a new game needs to know about its pack: Daily Words gets today's five, other packs deal
+// five fresh words (one per possible player), and Wide Open deals nothing.
+function packFields(packId, lastShout) {
+  const extra = lastShout ? { lastShout } : {};
+  if (packId === 'daily') return { pack: 'daily', daily: { date: todayKey(), words: dailyWords() }, ...extra };
+  const p = PACKS[packId];
+  if (p?.words) return { pack: p.id, deal: deal(p.words, MAX_PLAYERS), ...extra };
+  return extra;
+}
+const packName = (g) => (g?.pack && T.packs[g.pack] ? T.packs[g.pack].name : g?.daily ? T.packs.daily.name : '');
+
 async function createGame(opts = {}) {
   const name = cleanWord(state.name);
   if (!name) return fail(T.errors.nameFirst);
@@ -172,7 +189,7 @@ async function createGame(opts = {}) {
       used: [],
       winWord: null,
       nudges: {},
-      ...(opts.daily ? { daily: { date: todayKey(), words: dailyWords() } } : {}),
+      ...packFields(opts.daily ? 'daily' : opts.pack, opts.lastShout),
     });
     state.busy = false;
     openGame(code);
@@ -209,9 +226,10 @@ async function startGame() {
   const g = state.game;
   if (g.order.length < MIN_PLAYERS) return;
   try {
-    if (g.daily) {
-      // Daily Words: round one is dealt, not typed. Everyone sees their weird word, then connects them all.
-      const words = g.order.map((u, i) => ({ uid: u, name: g.players[u].name, word: g.daily.words[i].word, def: g.daily.words[i].def }));
+    const dealt = g.daily?.words || g.deal;
+    if (dealt) {
+      // Daily Words and packs: round one is dealt, not typed. Everyone sees their word, then connects them all.
+      const words = g.order.map((u, i) => ({ uid: u, name: g.players[u].name, word: dealt[i].word, def: dealt[i].def || '' }));
       await updateDoc(gameRef(g.code), {
         status: 'playing', round: 2, revealed: 1, submitted: {},
         history: [{ round: 1, dealt: true, words }],
@@ -264,13 +282,14 @@ async function resolveRound(g) {
     subsSnap.forEach((d) => { byUid[d.id] = d.data(); });
     if (!g.order.every((u) => byUid[u])) return;
     const words = g.order.map((u) => ({ uid: u, name: g.players[u].name, word: byUid[u].word, norm: byUid[u].norm }));
+    const shout = pickShout(T.packs[g.pack]?.shouts, g.lastShout || store.get(`shout.${g.pack}`));
     await runTransaction(db, async (tx) => {
       const snap = await tx.get(gameRef(g.code));
       const cur = snap.data();
       if (cur.status !== 'playing' || cur.round !== round || cur.revealed !== round) return;
       const history = [...cur.history, { round, words: words.map(({ uid, name, word }) => ({ uid, name, word })) }];
       if (allMatch(words)) {
-        tx.update(gameRef(g.code), { history, status: 'won', winWord: words[0].word });
+        tx.update(gameRef(g.code), { history, status: 'won', winWord: words[0].word, ...(shout ? { shout } : {}) });
       } else {
         const used = [...new Set([...cur.used, ...words.map((w) => w.norm)])];
         tx.update(gameRef(g.code), { history, used, round: round + 1, submitted: {} });
@@ -352,6 +371,8 @@ async function playAgain() {
       code, hostUid: state.uid, status: 'lobby', createdAt: serverTimestamp(),
       players: { [state.uid]: { name: old.players[state.uid].name, joinedAt: Date.now() } },
       order: [state.uid], round: 1, revealed: 0, submitted: {}, history: [], used: [], winWord: null, nudges: {},
+      // Same pack, fresh words. (Daily Words only has today's five, so a rematch goes Wide Open.)
+      ...packFields(old.pack === 'daily' ? null : old.pack, old.shout || old.lastShout),
     });
     followed.add(code);
     await updateDoc(gameRef(old.code), { next: code, nextBy: state.uid });
@@ -391,7 +412,8 @@ function shareText(g) {
     const dots = h.words.map((w) => (last ? '🟣' : counts[normalize(w.word)] > 1 ? '🟠' : '⚪')).join('');
     return `${dots} ${h.words.map((w) => w.word).join(' · ')}`;
   });
-  const head = (g.wonBy === 'vote' ? T.share.headVote : T.share.head)(g.winWord, g.history.length);
+  const name = packName(g);
+  const head = (g.wonBy === 'vote' ? T.share.headVote : T.share.head)(g.winWord, g.history.length, name && g.pack !== 'daily' ? T.packs.shareIn(name) : '');
   return `${head}\n\n${lines.join('\n')}\n\n${T.share.playWithUs}`;
 }
 
@@ -408,8 +430,9 @@ async function shareGame() {
 async function newCrew() {
   const g = state.game;
   if (!cleanWord(state.name)) state.name = g.players[state.uid]?.name || '';
+  const pack = g.pack === 'daily' ? null : g.pack;
   leaveGame();
-  createGame();
+  createGame({ pack, lastShout: g.shout });
 }
 
 // ---------- your games ----------
@@ -641,6 +664,7 @@ function openGame(code) {
     const g = snap.data();
     state.game = g;
     if (g.players[state.uid]) rememberGame(code);
+    if (g.shout && g.pack) store.set(`shout.${g.pack}`, g.shout);
 
     // Nudged?
     const n = g.nudges?.[state.uid];
@@ -753,6 +777,42 @@ function viewHome() {
   </main>`;
 }
 
+// The pack picker: every free pack, plus a locked peek at the next Plus pack.
+function viewPacksSheet() {
+  const P = T.packs;
+  const tile = (id) => {
+    const p = PACKS[id];
+    return `
+      <button class="pack-tile pt-${id}" data-act="pick-pack" data-pack="${id}" ${state.busy ? 'disabled' : ''}>
+        <span class="pack-art">${art(p.art, 84)}</span>
+        <span class="pack-text"><span class="pack-name">${P[id].name}</span><span class="pack-blurb">${P[id].blurb}</span></span>
+        <span class="pack-tag">${P.free}</span>
+      </button>`;
+  };
+  return `
+  <div class="sheet-backdrop" data-act="closepacks">
+    <div class="sheet packs-sheet" role="dialog" aria-modal="true" aria-labelledby="packs-title" data-stop>
+      <div class="grabber"></div>
+      <div class="row between">
+        <h2 id="packs-title" class="h-sheet">${P.pickTitle}</h2>
+        <button class="icon-btn soft" data-act="closepacks" aria-label="${T.a11y.close}">${closeIcon}</button>
+      </div>
+      <p class="muted">${P.pickSub}</p>
+      <div class="pack-list">
+        ${PICKER.map(tile).join('')}
+        <button class="pack-tile pt-${TEASER.id} locked" data-act="pack-teaser">
+          <span class="pack-art">${art(TEASER.art, 84)}</span>
+          <span class="pack-text"><span class="pack-name">${P[TEASER.id].name}</span><span class="pack-blurb">${P.soon}</span></span>
+          <span class="pack-tag plus">${P.plus}</span>
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// A pack's logo always sits on its own chalk-white card.
+const packLogo = (g, h = 150) => (skinOf(g) ? `<div class="pack-logo">${art(PACKS[g.pack].logo, h)}</div>` : '');
+
 function viewJoin(g) {
   // Opened a link to a game I'm not in yet.
   const full = g.order.length >= MAX_PLAYERS;
@@ -764,6 +824,7 @@ function viewJoin(g) {
       ${art('logo', 170, 'hero-logo')}
       <h1 class="wordmark small">Brain<b>smith</b></h1>
       <p class="tagline">${T.join.invited(esc(nameOf(g, g.hostUid) || T.aFriend), esc(g.code))}</p>
+      ${packName(g) ? `<span class="badge">${esc(packName(g))}</span>` : ''}
     </div>
     <div class="grow"></div>
     ${started ? `<p class="notice">${T.join.started}</p>
@@ -785,7 +846,7 @@ function viewLobby(g) {
   <main class="screen">
     ${header(g, T.lobby.title)}
     <section class="card center-text">
-      ${g.daily ? `<span class="badge">${T.lobby.dailyBadge}</span>` : ''}
+      ${skinOf(g) ? packLogo(g, 130) : g.daily ? `<span class="badge">${T.lobby.dailyBadge}</span>` : ''}
       <span class="muted">${T.lobby.inviteWith}</span>
       <div class="big-code">${esc(g.code)}</div>
       <button class="btn soft" data-act="share">${T.lobby.shareLink}</button>
@@ -819,7 +880,7 @@ function viewRound(g) {
       ${prev ? `
         <span class="muted">${T.round.connect}</span>
         <div class="word-chips">${prev.words.map((w) => `<span class="word-chip" style="--pc:${colorOf(g, w.uid)}">${esc(wordOf(w))}${reactionBadges(g, prev.round, w.uid)}</span>`).join('')}</div>
-        ${prev.dealt ? `<div class="defs">${prev.words.map((w) => `<span><strong>${esc(w.word)}:</strong> ${esc(w.def)}</span>`).join('')}</div>` : ''}
+        ${prev.dealt && prev.words.some((w) => w.def) ? `<div class="defs">${prev.words.filter((w) => w.def).map((w) => `<span><strong>${esc(w.word)}:</strong> ${esc(w.def)}</span>`).join('')}</div>` : ''}
         ${g.vote?.round === prev.round || prev.dealt ? '' : `<button class="linkish close-link" data-act="vote">${T.round.askClose}</button>`}`
       : `
         <span class="muted">${T.round.roundOne}</span>
@@ -907,13 +968,13 @@ function viewReveal(g, entry) {
 function viewDealt(g, entry) {
   return `
   <main class="screen reveal-screen">
-    ${header(g, T.dealt.title)}
+    ${header(g, T.packs[g.pack]?.dealtTitle || T.dealt.title)}
     <section class="stack reveal">
       ${entry.words.map((w) => `
         <div class="reveal-card" style="--pc:${colorOf(g, w.uid)}">
           <span class="rname">${T.dealt.got(esc(whoOf(w)))}</span>
           <span class="rword">${esc(w.word)}</span>
-          <span class="rdef">${esc(w.def)}</span>
+          ${w.def ? `<span class="rdef">${esc(w.def)}</span>` : ''}
         </div>`).join('')}
     </section>
     <div class="after-reveal stack">
@@ -949,8 +1010,9 @@ function viewWon(g) {
   return `
   <main class="screen win">
     <div class="win-top">
-      <div class="pop win-art">${art('swing', 150)}</div>
-      <h1 class="win-title">${g.wonBy === 'vote' ? T.won.closeEnough : T.won.forged}</h1>
+      <div class="pop win-art">${skinOf(g) ? art(PACKS[g.pack].art, 150) : art('swing', 150)}</div>
+      <h1 class="win-title">${g.wonBy === 'vote' ? T.won.closeEnough : esc(g.shout || T.won.forged)}</h1>
+      ${skinOf(g) ? `<span class="win-pack">${T.packs.forgedIn(packName(g))}</span>` : ''}
       <span class="win-sub">${g.wonBy === 'vote' ? T.won.agreed : T.won.everyone}</span>
       <div class="win-word">${esc(g.winWord)}</div>
       <span class="win-sub">${esc(nameList)} · ${T.rounds(g.history.length)}</span>
@@ -1308,10 +1370,16 @@ function render() {
   const sheetWasOpen = !!$app.querySelector('.sheet-backdrop:not(.tour)');
   const tourWasOpen = !!$app.querySelector('.tour');
   const toastWas = $app.querySelector('.toast')?.textContent;
+  const skin = state.code ? skinOf(g) : null;
+  if (document.body.dataset.pack !== (skin || '')) {
+    document.body.dataset.pack = skin || '';
+    setPackBackdrop(skin);
+  }
   $app.innerHTML = currentView()
     + (state.showUsed && g ? viewUsedSheet(g) : '')
     + (state.showGames && !state.code ? viewGamesSheet() : '')
     + (state.showSettings && !state.code && !state.showAccount ? viewSettingsSheet() : '')
+    + (state.showPacks && !state.code ? viewPacksSheet() : '')
     + (state.showAccount && !state.code ? viewAccountSheet() : '')
     + (state.reportFor && g?.players[state.reportFor] ? viewReportSheet(g) : '')
     + (state.tour !== null ? viewTour() : '')
@@ -1340,11 +1408,11 @@ function render() {
 
 function playScreenFx(main, g) {
   if (main.classList.contains('reveal-screen')) {
-    drumroll(1.4);
-    if (main.querySelector('.matched')) setTimeout(closeSting, 1700);
+    drumroll(1.4, skinOf(g));
+    if (main.querySelector('.matched')) setTimeout(() => closeSting(skinOf(g)), 1700);
   } else if (main.classList.contains('win')) {
-    confetti();
-    fanfare();
+    confetti(PACKS[skinOf(g)]?.confetti);
+    fanfare(g?.wonBy === 'vote' ? null : skinOf(g));
     try { navigator.vibrate?.([80, 60, 160]); } catch { /* not supported */ }
   }
 }
@@ -1360,7 +1428,12 @@ $app.addEventListener('submit', (e) => {
   e.preventDefault();
   const form = e.target.dataset.form;
   const data = new FormData(e.target);
-  if (form === 'create') createGame();
+  if (form === 'create') {
+    const name = cleanWord(state.name);
+    if (!name) return fail(T.errors.nameFirst);
+    if (isRude(name)) return fail(T.errors.rudeName);
+    state.showPacks = true; render();
+  }
   if (form === 'join') joinGame(data.get('code'));
   if (form === 'joinlink') joinGame(state.code);
   if (form === 'word') submitWord(data.get('word'));
@@ -1412,6 +1485,9 @@ $app.addEventListener('click', async (e) => {
   if (act === 'remove') removePlayer(el.dataset.uid);
   if (act === 'react') react(Number(el.dataset.round), el.dataset.uid, el.dataset.emoji);
   if (act === 'daily') createGame({ daily: true });
+  if (act === 'pick-pack') { state.showPacks = false; createGame({ pack: el.dataset.pack }); }
+  if (act === 'pack-teaser') toast(T.packs.soonToast);
+  if (act === 'closepacks' && (el.tagName === 'BUTTON' || !e.target.closest('[data-stop]'))) { state.showPacks = false; render(); }
   if (act === 'newcrew') newCrew();
   if (act === 'mute') { setMuted(!isMuted()); render(); }
   if (act === 'alerts-on') alertsOnTap();
@@ -1450,6 +1526,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && state.showUsed) { state.showUsed = false; render(); }
   if (e.key === 'Escape' && state.showGames) { state.showGames = false; render(); }
   if (e.key === 'Escape' && state.showSettings) { state.showSettings = false; render(); }
+  if (e.key === 'Escape' && state.showPacks) { state.showPacks = false; render(); }
   if (e.key === 'Escape' && state.showAccount) { state.showAccount = false; render(); }
   if (e.key === 'Escape' && state.reportFor) { state.reportFor = null; render(); }
   if (state.tour !== null && e.key === 'ArrowRight' && state.tour < TOUR.length - 1) goTour(state.tour + 1);

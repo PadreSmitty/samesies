@@ -46,26 +46,105 @@ function tone(freq, t, len, vol = 0.18, type = 'triangle') {
 }
 
 // Snare roll that builds for `secs`, then a bright hit as the words flip.
-export function drumroll(secs = 1.4) {
+// In a pack, the flip, "so close" and win each get the pack's own sound instead.
+export function drumroll(secs = 1.4, pack = null) {
   if (!ready()) return;
   const now = ctx.currentTime;
-  for (let t = 0; t < secs; t += 0.045) hit(now + t, 0.08 + 0.35 * (t / secs));
+  for (let t = 0; t < secs; t += 0.045) hit(now + t, (0.08 + 0.35 * (t / secs)) * (PACK_FX[pack] ? 0.6 : 1));
+  if (PACK_FX[pack]) { PACK_FX[pack].flip(now + secs); return; }
   hit(now + secs, 0.7);
   tone(523, now + secs, 0.5, 0.15); tone(784, now + secs, 0.6, 0.12);
 }
 
-export function closeSting() {
+export function closeSting(pack = null) {
   if (!ready()) return;
   const t = ctx.currentTime;
+  if (PACK_FX[pack]) { PACK_FX[pack].close(t); return; }
   tone(440, t, 0.25); tone(554, t + 0.12, 0.35);
 }
 
-export function fanfare() {
+export function fanfare(pack = null) {
   if (!ready()) return;
-  const t = ctx.currentTime;
+  let t = ctx.currentTime;
+  if (PACK_FX[pack]) t += PACK_FX[pack].win(t);
   [523, 659, 784, 1047].forEach((f, i) => tone(f, t + i * 0.11, i === 3 ? 0.9 : 0.3, 0.2));
   tone(1319, t + 0.44, 0.9, 0.08, 'sine');
 }
+
+// ---------- pack sounds ----------
+// Stand-ins made on the fly. The real recordings (animal calls, a ref's whistle, a real crowd)
+// replace these before launch; Smitty reviews them at beta.
+function noise(secs) {
+  const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * secs), ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource(); src.buffer = buf; return src;
+}
+
+function sweep(t, from, to, len, vol = 0.12, type = 'sine') {
+  const o = ctx.createOscillator(); o.type = type;
+  o.frequency.setValueAtTime(from, t); o.frequency.exponentialRampToValueAtTime(to, t + len * 0.6);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + len + 0.05);
+}
+
+function filtered(t, secs, type, freq, vol, shape) {
+  const src = noise(secs);
+  const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = 0.7;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  shape(g.gain, t);
+  src.connect(f).connect(g).connect(ctx.destination); src.start(t); src.stop(t + secs);
+  return f;
+}
+
+const rustle = (t) => filtered(t, 0.5, 'bandpass', 3200, 0, (gain) => {
+  for (let i = 0; i < 5; i++) { gain.linearRampToValueAtTime(0.05 + Math.random() * 0.15, t + i * 0.07 + 0.02); gain.linearRampToValueAtTime(0.02, t + i * 0.07 + 0.06); }
+  gain.linearRampToValueAtTime(0.0001, t + 0.45);
+});
+const chirp = (t, base) => sweep(t, base, base * 1.7, 0.14, 0.1);
+const hoot = (t) => [0, 0.18, 0.34].forEach((d, i) => sweep(t + d, 420 + i * 90, 620 + i * 120, 0.16, 0.1, 'triangle'));
+const crowd = (t, secs, vol) => filtered(t, secs, 'bandpass', 900, 0, (gain) => {
+  gain.linearRampToValueAtTime(vol, t + secs * 0.3); gain.linearRampToValueAtTime(vol * 0.8, t + secs * 0.7); gain.linearRampToValueAtTime(0.0001, t + secs);
+});
+
+function whistle(t, len) {
+  const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 2900;
+  const lfo = ctx.createOscillator(); lfo.frequency.value = 38;
+  const lg = ctx.createGain(); lg.gain.value = 140;
+  lfo.connect(lg).connect(o.frequency);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.02); g.gain.setValueAtTime(0.09, t + len - 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  o.connect(g).connect(ctx.destination); o.start(t); lfo.start(t); o.stop(t + len + 0.05); lfo.stop(t + len + 0.05);
+}
+
+function roar(t) {
+  const o = ctx.createOscillator(); o.type = 'sawtooth';
+  o.frequency.setValueAtTime(150, t); o.frequency.linearRampToValueAtTime(210, t + 0.35); o.frequency.exponentialRampToValueAtTime(70, t + 1.2);
+  const f = ctx.createBiquadFilter(); f.type = 'lowpass';
+  f.frequency.setValueAtTime(400, t); f.frequency.linearRampToValueAtTime(1500, t + 0.35); f.frequency.exponentialRampToValueAtTime(250, t + 1.2);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.2, t + 0.15); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.25);
+  o.connect(f).connect(g).connect(ctx.destination); o.start(t); o.stop(t + 1.3);
+}
+
+const PACK_FX = {
+  zoo: {
+    flip(t) {
+      rustle(t);
+      const r = Math.random();
+      if (r < 0.4) { chirp(t + 0.4, 2400); chirp(t + 0.56, 2900); } else if (r < 0.7) hoot(t + 0.4); else sweep(t + 0.4, 130, 90, 0.3, 0.12, 'sawtooth');
+    },
+    close(t) { chirp(t, 2200); chirp(t + 0.13, 2800); },
+    win(t) { roar(t); return 1.1; },
+  },
+  sports: {
+    flip(t) { whistle(t, 0.3); crowd(t + 0.3, 1, 0.18); },
+    close(t) { crowd(t, 0.9, 0.16).frequency.linearRampToValueAtTime(500, t + 0.9); },
+    win(t) { tone(220, t, 0.8, 0.12, 'square'); crowd(t + 0.3, 1.6, 0.3); return 0.9; },
+  },
+};
 
 export function confetti(colors = ['#FF6A4D', '#FFFFFF', '#FFB020', '#8A8CFF', '#1FB895']) {
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
