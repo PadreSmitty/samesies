@@ -367,7 +367,7 @@ export const T = {
     free: 'FREE',
     plus: 'PLUS',
     soon: 'Coming with Plus',
-    soonToast: 'Creature Feature comes with Brainsmith Plus. Soon!',
+    soonToast: (name) => `${name} comes with Brainsmith Plus. Soon!`,
     forgedIn: (name) => `Forged in ${name}`,
     shareIn: (name) => ` in ${name}`, // goes inside the share line, before the !
     open: { name: 'Wide Open', blurb: 'No pack. Anything goes from the very first word.' },
@@ -384,6 +384,24 @@ export const T = {
       dealtTitle: 'Huddle up!',
       shouts: ['Score!', 'Homerun!', 'Swish!', 'Gold!', 'GG!', 'Game, set, match!', 'Goal!', 'Knockout!', 'Touchdown!', 'Hole in one!'],
     },
-    monsters: { name: 'Creature Feature', blurb: 'Movie monsters, from the classics to the cult weirdos.' },
+    preview: 'PREVIEW',
+    previewOn: 'Plus preview is on for this phone.',
+    // DRAFT: name, shouts and words wait on Smitty's review (preview only until then).
+    nineties: {
+      name: 'Totally Rad',
+      blurb: 'Pagers, mixtapes and a hall pass. No brands, all vibes.',
+      dealtTitle: 'Class is in session!',
+      forged: 'Forged in the 90s',
+      shareIn: ' in the 90s',
+      shouts: ['Jinx!', 'Booyah!', 'Totally rad!', 'Da bomb!', 'All that and a bag of chips!', 'Word!', 'Phat!', 'Off the hook!', 'Bodacious!', 'Fresh!'],
+    },
+    monsters: {
+      name: 'Creature Feature',
+      blurb: 'The Pope Lick Monster is real Kentucky folklore. So is the Hodag. Good luck.',
+      dealtTitle: 'Now showing!',
+      forged: 'Forged at the Creature Feature',
+      shareIn: ' at the Creature Feature',
+      shouts: ['It’s alive!', 'Brains!', 'Mwahaha!', 'Boo!', 'AAAAAHHH!', 'Monster hit!', 'Full moon!', 'Unleashed!', 'Encore!', 'The End…?'],
+    },
   },
 };

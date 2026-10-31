@@ -10,7 +10,7 @@ import { isRude } from './rude.js';
 import { MIN_PLAYERS, MAX_PLAYERS, makeCode, normalize, cleanWord, isUsed, allMatch, nearlyMatch, commonWord } from './logic.js';
 import { STARTERS } from './starters.js';
 import { DAILY_WORDS } from './dailywords.js';
-import { PACKS, PICKER, TEASER, skinOf, deal, pickShout } from './packs.js';
+import { PACKS, PICKER, PLUS_PICKER, skinOf, deal, pickShout } from './packs.js';
 import { firebaseConfig } from './firebase-config.js';
 import { alertSupport, alertPermission, alertsOn, turnOnAlerts, turnOffAlerts, refreshAlerts } from './alerts.js';
 import { T } from './strings.js';
@@ -30,6 +30,18 @@ if (emu) {
 }
 
 const $app = document.getElementById('app');
+
+// Plus. Buying it comes with the store apps; until then a phone can turn on a preview
+// (open the game once with ?plus=preview, or ?plus=off to turn it back off). Draft packs show only in preview.
+(() => {
+  const q = new URLSearchParams(location.search).get('plus');
+  try {
+    if (q === 'preview') localStorage.setItem('samesies.plusPreview', '1');
+    if (q === 'off') localStorage.removeItem('samesies.plusPreview');
+  } catch { /* private mode */ }
+})();
+const plusPreview = () => { try { return localStorage.getItem('samesies.plusPreview') === '1'; } catch { return false; } };
+const hasPlus = () => plusPreview();
 
 // ---------- local storage (per device conveniences only) ----------
 const store = {
@@ -115,6 +127,7 @@ function fail(err) {
 const ART = {
   logo: [409, 640], spark: [358, 360], bolt: [195, 360], hammer: [313, 360], bolts: [383, 360], burst: [343, 360], swing: [342, 360],
   'zoo-logo': [570, 600], 'zoo-art': [440, 360], 'sports-logo': [455, 600], 'sports-art': [348, 360], 'monsters-art': [308, 360],
+  'monsters-logo': [404, 600], 'nineties-art': [226, 360], 'nineties-logo': [580, 600],
 };
 const art = (name, h, cls = '') => { const [w0, h0] = ART[name]; return `<img class="art ${cls}" src="art/${name}.webp" width="${Math.round(w0 * h / h0)}" height="${h}" alt="" aria-hidden="true" decoding="async">`; };
 const helpIcon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.8"/><path d="M12 17.2h.01"/></svg>`;
@@ -157,6 +170,8 @@ function packFields(packId, lastShout) {
   const extra = lastShout ? { lastShout } : {};
   if (packId === 'daily') return { pack: 'daily', daily: { date: todayKey(), words: dailyWords() }, ...extra };
   const p = PACKS[packId];
+  // Plus packs are the host's to start (friends play free), so a rematch hosted by someone without Plus goes Wide Open.
+  if (p?.plus && !hasPlus()) return extra;
   if (p?.words) return { pack: p.id, deal: deal(p.words, MAX_PLAYERS), ...extra };
   return extra;
 }
@@ -413,7 +428,7 @@ function shareText(g) {
     return `${dots} ${h.words.map((w) => w.word).join(' · ')}`;
   });
   const name = packName(g);
-  const head = (g.wonBy === 'vote' ? T.share.headVote : T.share.head)(g.winWord, g.history.length, name && g.pack !== 'daily' ? T.packs.shareIn(name) : '');
+  const head = (g.wonBy === 'vote' ? T.share.headVote : T.share.head)(g.winWord, g.history.length, name && g.pack !== 'daily' ? (T.packs[g.pack]?.shareIn || T.packs.shareIn(name)) : '');
   return `${head}\n\n${lines.join('\n')}\n\n${T.share.playWithUs}`;
 }
 
@@ -786,7 +801,7 @@ function viewPacksSheet() {
       <button class="pack-tile pt-${id}" data-act="pick-pack" data-pack="${id}" ${state.busy ? 'disabled' : ''}>
         <span class="pack-art">${art(p.art, 84)}</span>
         <span class="pack-text"><span class="pack-name">${P[id].name}</span><span class="pack-blurb">${P[id].blurb}</span></span>
-        <span class="pack-tag">${P.free}</span>
+        <span class="pack-tag${p.plus ? ' plus' : ''}">${p.draft ? P.preview : p.plus ? P.plus : P.free}</span>
       </button>`;
   };
   return `
@@ -800,11 +815,12 @@ function viewPacksSheet() {
       <p class="muted">${P.pickSub}</p>
       <div class="pack-list">
         ${PICKER.map(tile).join('')}
-        <button class="pack-tile pt-${TEASER.id} locked" data-act="pack-teaser">
-          <span class="pack-art">${art(TEASER.art, 84)}</span>
-          <span class="pack-text"><span class="pack-name">${P[TEASER.id].name}</span><span class="pack-blurb">${P.soon}</span></span>
+        ${PLUS_PICKER.filter((id) => !PACKS[id].draft || plusPreview()).map((id) => (hasPlus() ? tile(id) : `
+        <button class="pack-tile pt-${id} locked" data-act="pack-teaser" data-pack="${id}">
+          <span class="pack-art">${art(PACKS[id].art, 84)}</span>
+          <span class="pack-text"><span class="pack-name">${P[id].name}</span><span class="pack-blurb">${P.soon}</span></span>
           <span class="pack-tag plus">${P.plus}</span>
-        </button>
+        </button>`)).join('')}
       </div>
     </div>
   </div>`;
@@ -1012,7 +1028,7 @@ function viewWon(g) {
     <div class="win-top">
       <div class="pop win-art">${skinOf(g) ? art(PACKS[g.pack].art, 150) : art('swing', 150)}</div>
       <h1 class="win-title">${g.wonBy === 'vote' ? T.won.closeEnough : esc(g.shout || T.won.forged)}</h1>
-      ${skinOf(g) ? `<span class="win-pack">${T.packs.forgedIn(packName(g))}</span>` : ''}
+      ${skinOf(g) ? `<span class="win-pack">${esc(T.packs[g.pack]?.forged || T.packs.forgedIn(packName(g)))}</span>` : ''}
       <span class="win-sub">${g.wonBy === 'vote' ? T.won.agreed : T.won.everyone}</span>
       <div class="win-word">${esc(g.winWord)}</div>
       <span class="win-sub">${esc(nameList)} · ${T.rounds(g.history.length)}</span>
@@ -1485,8 +1501,8 @@ $app.addEventListener('click', async (e) => {
   if (act === 'remove') removePlayer(el.dataset.uid);
   if (act === 'react') react(Number(el.dataset.round), el.dataset.uid, el.dataset.emoji);
   if (act === 'daily') createGame({ daily: true });
-  if (act === 'pick-pack') { state.showPacks = false; createGame({ pack: el.dataset.pack }); }
-  if (act === 'pack-teaser') toast(T.packs.soonToast);
+  if (act === 'pick-pack') { state.showPacks = false; if (PACKS[el.dataset.pack]?.plus && !hasPlus()) toast(T.packs.soonToast(T.packs[el.dataset.pack].name)); else createGame({ pack: el.dataset.pack }); }
+  if (act === 'pack-teaser') toast(T.packs.soonToast(T.packs[el.dataset.pack]?.name || T.appName));
   if (act === 'closepacks' && (el.tagName === 'BUTTON' || !e.target.closest('[data-stop]'))) { state.showPacks = false; render(); }
   if (act === 'newcrew') newCrew();
   if (act === 'mute') { setMuted(!isMuted()); render(); }

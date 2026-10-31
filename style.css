@@ -587,3 +587,70 @@ body[data-pack]:not([data-pack=""]) .btn.coral { background: var(--btn); color: 
 body[data-pack]:not([data-pack=""]) .win-art .art { filter: drop-shadow(0 4px 0 rgba(0,0,0,0.2)); }
 body[data-pack]:not([data-pack=""]) .badge { background: var(--indigo); color: var(--on-btn); }
 body[data-pack]:not([data-pack=""]) .so-close-names em { color: var(--indigo); }
+
+/* Creature Feature: an old movie palace. The silver screen is the background, so text on it is dark. */
+body[data-pack="monsters"] {
+  --ground: #E4ECEE; --ink: #1A1320; --muted: #4A4256; --faint: #7A7086; --line: #C3CDD1;
+  --indigo: #7A3CE0; --indigo-dark: #6630C4; --indigo-soft: rgba(122,60,224,0.12); --coral: #A3203A; --danger: #A3203A;
+  --card: #FFF6E0; --btn: #A3203A; --btn-hover: #8A1A31; --on-btn: #FFF6E0; --toast-bg: #1A1320; --toast-fg: #FFF6E0;
+  --cardback:
+    repeating-linear-gradient(180deg, rgba(255,246,224,0.85) 0 5px, transparent 5px 11px) 5px 6px/6px calc(100% - 12px) no-repeat,
+    repeating-linear-gradient(180deg, rgba(255,246,224,0.85) 0 5px, transparent 5px 11px) calc(100% - 5px) 6px/6px calc(100% - 12px) no-repeat,
+    linear-gradient(90deg, #1A1320 0 16px, transparent 16px calc(100% - 16px), #1A1320 calc(100% - 16px)),
+    radial-gradient(circle at 50% 50%, #A3203A 0 55%, #7A1429 100%);
+  --cardback-edge: #FFC23D;
+  background: #E4ECEE;
+  color-scheme: light;
+}
+body[data-pack="monsters"] .pack-bg {
+  background:
+    repeating-linear-gradient(90deg, #A3203A 0 7px, #7A1429 7px 11px, #A3203A 11px 16px) left top/16px 100% no-repeat,
+    repeating-linear-gradient(90deg, #A3203A 0 7px, #7A1429 7px 11px, #A3203A 11px 16px) right top/16px 100% no-repeat,
+    radial-gradient(75% 55% at 50% 42%, #FFFFFF 0%, #E4ECEE 55%, #B9C7CC 100%);
+}
+body[data-pack="monsters"] :is(.card, .player, .reveal-card, .vote, .sheet, .input, .alert-ask, .icon-btn:not(.back)) {
+  --ink: #1A1320; --muted: #5A4E46; --faint: #8A7E70; --line: #E6D9BC; --indigo: #7A3CE0; --indigo-soft: #F1E6CC; --ground: #F1E6CC;
+  --btn: #A3203A; --btn-hover: #8A1A31; --on-btn: #FFF6E0; --coral: #A3203A;
+  color: var(--ink);
+}
+body[data-pack="monsters"] .player, body[data-pack="monsters"] .card, body[data-pack="monsters"] .reveal-card { box-shadow: 0 3px 0 rgba(26,19,32,0.18); }
+/* the win is a B-movie poster: house lights down, title glowing slime green */
+body[data-pack="monsters"]:has(.win) { background: #1A1320; }
+body[data-pack="monsters"]:has(.win) .pack-bg {
+  background:
+    repeating-linear-gradient(90deg, #A3203A 0 7px, #7A1429 7px 11px, #A3203A 11px 16px) left top/16px 100% no-repeat,
+    repeating-linear-gradient(90deg, #A3203A 0 7px, #7A1429 7px 11px, #A3203A 11px 16px) right top/16px 100% no-repeat,
+    radial-gradient(70% 40% at 50% 20%, #3A2A48 0%, #1A1320 70%);
+}
+body[data-pack="monsters"] .screen.win .win-title { color: #86D23A; text-shadow: 0 0 18px rgba(134,210,58,0.55); transform: rotate(-3deg); }
+body[data-pack="monsters"] .screen.win .win-pack { color: #FFC23D; }
+body[data-pack="monsters"] .screen.win .btn.white { color: #1A1320; }
+body[data-pack="monsters"] .screen.win .chain { background: rgba(255,246,224,0.08); border: 1px solid rgba(255,194,61,0.35); }
+
+/* The 90s (draft): a high school hallway at full volume. Neon Memphis shapes on near-black,
+   white cards with a hard hot-pink shadow. */
+body[data-pack="nineties"] {
+  --ground: #15131F; --ink: #FFFFFF; --muted: #D9D6EA; --faint: #A6A2BF; --line: rgba(255,255,255,0.2);
+  --indigo: #FFE14D; --indigo-dark: #F5D21E; --indigo-soft: rgba(255,255,255,0.12); --coral: #FF2E93; --danger: #FF9CC8;
+  --card: #FFFFFF; --btn: #14C8C8; --btn-hover: #2EDADA; --on-btn: #15131F; --toast-bg: #FFE14D; --toast-fg: #15131F;
+  --cardback:
+    radial-gradient(circle at 20% 25%, #FF2E93 0 4px, transparent 5px),
+    radial-gradient(circle at 75% 70%, #14C8C8 0 4px, transparent 5px),
+    linear-gradient(135deg, transparent 0 40%, #FFE14D 40% 46%, transparent 46% 60%, #7B3FF2 60% 66%, transparent 66%),
+    #15131F;
+  --cardback-edge: #FFE14D;
+  background: #15131F;
+  color-scheme: dark;
+}
+body[data-pack="nineties"] .pack-bg { background: radial-gradient(90% 50% at 50% 0%, #2A1F4A 0%, #15131F 70%); }
+body[data-pack="nineties"] :is(.card, .player, .reveal-card, .vote, .sheet, .input, .alert-ask, .icon-btn:not(.back)) {
+  --ink: #15131F; --muted: #4D4866; --faint: #7D789A; --line: #E2DFF0; --indigo: #7B3FF2; --indigo-soft: #F0EAFF; --ground: #F0EAFF;
+  --btn: #FF2E93; --btn-hover: #E81F80; --on-btn: #FFFFFF; --coral: #FF2E93;
+  color: var(--ink);
+}
+body[data-pack="nineties"] :is(.card, .player) { border: 3px solid #15131F; }
+body[data-pack="nineties"] :is(.card, .player, .reveal-card) { box-shadow: 5px 5px 0 #FF2E93; }
+body[data-pack="nineties"] .reveal-card.matched { box-shadow: 5px 5px 0 #FF2E93, inset 0 0 0 3px #14C8C8; }
+body[data-pack="nineties"] .btn.primary { border: 3px solid #15131F; box-shadow: 4px 4px 0 #FFE14D; }
+body[data-pack="nineties"] .h-round, body[data-pack="nineties"] .win-title { font-style: italic; }
+body[data-pack="nineties"] .screen.win .win-title { color: #FFE14D; text-shadow: 4px 4px 0 #FF2E93, 8px 8px 0 #14C8C8; transform: rotate(-3deg); }

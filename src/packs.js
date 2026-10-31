@@ -3,6 +3,8 @@
 // Names, blurbs and shouts live in strings.js (T.packs); words live in src/packs/.
 import { ZOO_WORDS } from './packs/zoo-words.js';
 import { SPORTS_WORDS } from './packs/sports-words.js';
+import { MONSTERS_WORDS } from './packs/monsters-words.js';
+import { NINETIES_WORDS } from './packs/nineties-words.js';
 
 export const PACKS = {
   open: { id: 'open', art: 'logo', free: true },
@@ -15,11 +17,20 @@ export const PACKS = {
     id: 'sports', art: 'sports-art', logo: 'sports-logo', free: true, words: SPORTS_WORDS,
     confetti: ['#FFB21E', '#E23A4E', '#23A35A', '#F4F1E6', '#FFFFFF'],
   },
+  // Plus packs. "draft" packs only show up in Plus preview until Smitty approves them.
+  monsters: {
+    id: 'monsters', art: 'monsters-art', logo: 'monsters-logo', plus: true, words: MONSTERS_WORDS,
+    confetti: ['#86D23A', '#FFC23D', '#7A3CE0', '#FFF6E0', '#A3203A'],
+  },
+  nineties: {
+    id: 'nineties', art: 'nineties-art', logo: 'nineties-logo', plus: true, draft: true, words: NINETIES_WORDS,
+    confetti: ['#FF2E93', '#14C8C8', '#FFE14D', '#7B3FF2', '#111111'],
+  },
 };
 
-// The picker order. The locked teaser at the end shows what Plus brings.
+// The picker order: free packs, then Plus packs.
 export const PICKER = ['open', 'zoo', 'sports', 'daily'];
-export const TEASER = { id: 'monsters', art: 'monsters-art' };
+export const PLUS_PICKER = ['monsters', 'nineties'];
 
 // Packs with their own look (the rest use the regular Brainsmith colors).
 export const skinOf = (g) => (g && PACKS[g.pack]?.logo ? g.pack : null);

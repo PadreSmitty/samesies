@@ -116,4 +116,98 @@ const SCENES = {
       },
     };
   },
+  // An old movie palace: marquee bulbs chasing along the top, film scratches, a bat now and then,
+  // and fog drifting over the dark seats at the bottom.
+  monsters() {
+    let d = 1;
+    let t = 0;
+    let bat = null;
+    let fog = [];
+    const batPath = (c, x, y, s, flap) => {
+      c.save(); c.translate(x, y); c.scale(s, s * (0.6 + 0.4 * Math.abs(Math.sin(flap))));
+      c.beginPath();
+      c.moveTo(0, 0); c.quadraticCurveTo(-6, -8, -18, -6); c.quadraticCurveTo(-14, -2, -16, 3);
+      c.quadraticCurveTo(-10, 0, -8, 4); c.quadraticCurveTo(-4, 1, 0, 5);
+      c.quadraticCurveTo(4, 1, 8, 4); c.quadraticCurveTo(10, 0, 16, 3); c.quadraticCurveTo(14, -2, 18, -6);
+      c.quadraticCurveTo(6, -8, 0, 0); c.fill(); c.restore();
+    };
+    return {
+      reset(cv, dpr) {
+        d = dpr;
+        fog = Array.from({ length: 7 }, (_, i) => ({ x: (i / 7) * cv.width, r: (60 + Math.random() * 60) * d, v: (0.15 + Math.random() * 0.2) * d }));
+      },
+      draw(c, cv, move) {
+        const W = cv.width; const H = cv.height;
+        c.clearRect(0, 0, W, H);
+        // marquee bulbs
+        const gap = 22 * d; const n = Math.ceil(W / gap);
+        for (let i = 0; i <= n; i++) {
+          const on = (i + Math.floor(t / 8)) % 3 === 0;
+          c.fillStyle = on ? 'rgba(255,194,61,0.95)' : 'rgba(255,194,61,0.35)';
+          c.beginPath(); c.arc(i * gap + 6 * d, 5 * d, 3 * d, 0, 7); c.fill();
+        }
+        // film scratches and flicker
+        if (move && Math.random() < 0.08) {
+          c.strokeStyle = 'rgba(26,19,32,0.12)'; c.lineWidth = 1 * d;
+          const x = Math.random() * W; c.beginPath(); c.moveTo(x, 0); c.lineTo(x + (Math.random() - 0.5) * 20 * d, H); c.stroke();
+        }
+        if (move && Math.random() < 0.04) { c.fillStyle = 'rgba(255,255,255,0.12)'; c.fillRect(0, 0, W, H); }
+        // a bat swoops across now and then
+        if (move && !bat && Math.random() < 0.004) bat = { x: -40 * d, y: H * (0.15 + Math.random() * 0.4), v: (2 + Math.random()) * d, f: 0 };
+        if (bat) {
+          c.fillStyle = 'rgba(26,19,32,0.75)';
+          batPath(c, bat.x, bat.y + Math.sin(bat.f / 2) * 10 * d, 1.6 * d, bat.f / 3);
+          bat.x += bat.v; bat.f += 1; if (bat.x > W + 40 * d) bat = null;
+        }
+        // seats and fog
+        const seats = H * 0.94;
+        c.fillStyle = 'rgba(26,19,32,0.85)';
+        for (let x = 0; x < W; x += 30 * d) { c.beginPath(); c.arc(x + 15 * d, seats + 12 * d, 14 * d, Math.PI, 0); c.lineTo(x + 29 * d, H); c.lineTo(x + 1 * d, H); c.fill(); }
+        fog.forEach((f) => {
+          const g = c.createRadialGradient(f.x, seats, 0, f.x, seats, f.r);
+          g.addColorStop(0, 'rgba(240,244,245,0.55)'); g.addColorStop(1, 'rgba(240,244,245,0)');
+          c.fillStyle = g; c.fillRect(f.x - f.r, seats - f.r, f.r * 2, f.r * 2);
+          if (move) { f.x += f.v; if (f.x - f.r > W) f.x = -f.r; }
+        });
+        t += 1;
+      },
+    };
+  },
+  // The 90s: neon Memphis shapes (triangles, squiggles, rings, zigzags, confetti) drifting around.
+  nineties() {
+    const COLS = ['#FF2E93', '#14C8C8', '#FFE14D', '#7B3FF2'];
+    const KINDS = ['tri', 'squiggle', 'ring', 'zig', 'dot', 'dot', 'tri', 'squiggle'];
+    let shapes = [];
+    let d = 1;
+    const mk = (cv) => ({
+      k: KINDS[Math.floor(Math.random() * KINDS.length)], c: COLS[Math.floor(Math.random() * COLS.length)],
+      x: Math.random() * cv.width, y: Math.random() * cv.height, s: (14 + Math.random() * 18) * d,
+      r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.01, vx: (Math.random() - 0.5) * 0.25 * d, vy: (0.1 + Math.random() * 0.25) * d,
+    });
+    const draw1 = (c, o) => {
+      c.save(); c.translate(o.x, o.y); c.rotate(o.r); c.globalAlpha = 0.55;
+      c.strokeStyle = o.c; c.fillStyle = o.c; c.lineWidth = 4 * d; c.lineCap = 'round'; c.lineJoin = 'round';
+      const s = o.s;
+      c.beginPath();
+      if (o.k === 'tri') { c.moveTo(0, -s); c.lineTo(s * 0.9, s * 0.6); c.lineTo(-s * 0.9, s * 0.6); c.closePath(); c.fill(); }
+      if (o.k === 'ring') { c.arc(0, 0, s * 0.7, 0, 7); c.stroke(); }
+      if (o.k === 'dot') { c.arc(0, 0, s * 0.22, 0, 7); c.fill(); }
+      if (o.k === 'squiggle') { c.moveTo(-s, 0); for (let i = -s; i <= s; i += s / 2) c.quadraticCurveTo(i + s / 4, (i / (s / 2)) % 2 ? -s / 2 : s / 2, i + s / 2, 0); c.stroke(); }
+      if (o.k === 'zig') { c.moveTo(-s, s / 3); for (let i = 0; i < 4; i++) c.lineTo(-s + (i + 1) * s / 2, i % 2 ? s / 3 : -s / 3); c.stroke(); }
+      c.restore();
+    };
+    return {
+      reset(cv, dpr) { d = dpr; shapes = Array.from({ length: 22 }, () => mk(cv)); },
+      draw(c, cv, move) {
+        c.clearRect(0, 0, cv.width, cv.height);
+        shapes.forEach((o) => {
+          draw1(c, o);
+          if (!move) return;
+          o.x += o.vx; o.y += o.vy; o.r += o.vr;
+          if (o.y > cv.height + 40 * d) Object.assign(o, mk(cv), { y: -40 * d });
+          if (o.x < -40 * d) o.x = cv.width + 30 * d; if (o.x > cv.width + 40 * d) o.x = -30 * d;
+        });
+      },
+    };
+  },
 };

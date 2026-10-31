@@ -4,7 +4,7 @@ import { T } from '../src/strings.js';
 import { isRude } from '../src/rude.js';
 import { normalize } from '../src/logic.js';
 
-for (const id of ['zoo', 'sports']) {
+for (const id of ['zoo', 'sports', 'monsters', 'nineties']) {
   const p = PACKS[id];
   // Ten shouts each, all different
   assert.equal(T.packs[id].shouts.length, 10, id);
@@ -24,6 +24,7 @@ for (const id of ['zoo', 'sports']) {
 }
 assert.equal(PACKS.zoo.words.length, 170);
 assert.equal(PACKS.sports.words.length, 168);
+assert.equal(PACKS.monsters.words.length, 189);
 
 // Shouts never repeat twice in a row
 let last = null;
